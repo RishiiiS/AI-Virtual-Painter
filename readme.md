@@ -39,11 +39,11 @@ AI-Virtual-Painter/
 git clone https://github.com/your-username/AI-Virtual-Painter.git
 cd AI-Virtual-Painter
 
-2. Create and activate virtual environment
+### 2. Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-3.Install dependencies
+### 3.Install dependencies
 pip install -r requirements.txt
 Note: MediaPipe works best with Python 3.10
 
@@ -57,24 +57,24 @@ Two fingers up → Select color or mode
 Specific gesture → Clear canvas
 (Gestures may vary based on implementation)
 
-# Learning Outcomes.
+### Learning Outcomes.
 Hands-on experience with real-time computer vision
 Understanding hand landmark detection
 Gesture-based interaction design
 Managing Python projects using virtual environments
 
-# Future Improvements.
+### Future Improvements.
 Brush size control
 Save drawings as images
 Gesture-based undo/redo
 UI overlay for better user experience
 
-# contribution.
+### contribution.
 Feel free to fork the repository and experiment with new features.
 Pull requests are welcome.
 
-# License
+### License
 This project is for learning and educational purposes.
 
-# Author
+### Author
 Rishi Seth
