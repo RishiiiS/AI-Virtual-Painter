@@ -5,22 +5,59 @@ import os
 import time
 import handTracking as htm
 
-pTime = 0
-cTime = 0
-cap = cv2.VideoCapture(0)
-Detector = htm.handDetect()
-while True:
-    succ,img = cap.read()
-    img = Detector.findHands(img)
-    lmList = Detector.findPosition(img)
-    # if len(lmList)!=0:
-        # print(lmList[4])
-    # putting fps. 
-    cTime = time.time()
-    fps = 1/(cTime - pTime)
-    pTime = cTime
-    cv2.putText(img,str(int(fps)),(10,70),cv2.FONT_HERSHEY_PLAIN,3,(0,0,255),3)
+folderPath = "header"
+myList = os.listdir(folderPath)
+print(myList)
 
+overlayList = []
+for imPath in myList:
+    if imPath.lower().endswith(('.png', '.jpg', '.jpeg')):
+        img = cv2.imread(os.path.join(folderPath, imPath))
+        if img is not None:
+            overlayList.append(img)
+
+header = overlayList[0]
+
+# -------- CAMERA --------
+cap = cv2.VideoCapture(0)
+image_canvas = np.zeros((720, 1280, 3),dtype=np.uint8)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+# -------- RESIZE HEADER ONCE --------
+HEADER_HEIGHT = 100
+FRAME_WIDTH = 1280
+header = cv2.resize(header, (FRAME_WIDTH, HEADER_HEIGHT))
+ 
+detector = htm.handDetect(min_dect_confidence = 0.85)
+
+# -------- MAIN LOOP --------
+while True:
+    # import image----1
+    success, img = cap.read()
+    img = cv2.flip(img,1)
+    if not success:
+        break
+
+    # find landmark---2
+    img = detector.findHands(img)
+    lmList = detector.findPosition(img,draw=False)
+    if len(lmList) != 0:
+        # print(lmList)q
+        # tip of index and middle finger.
+        x1,y1 = lmList[8][1:]
+        x2,y2 = lmList[12][1:]
+        xthumb,ythumb = lmList[4][1:]
+        xlittle,ylittle = lmList[20][1:]
+
+
+    # check which fingers are up---3
+        fingers = detector.fingersUp()
+        print(fingers)
+
+    # setting the header image.
+    img[0:HEADER_HEIGHT, 0:FRAME_WIDTH] = header
+    # img = cv2.addWeighted(img,0.5,image_canvas,0.5,0)
 
     cv2.imshow("image",img)
     # stop on pressing q.
