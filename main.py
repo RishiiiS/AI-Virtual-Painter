@@ -30,6 +30,7 @@ FRAME_WIDTH = 1280
 header = cv2.resize(header, (FRAME_WIDTH, HEADER_HEIGHT))
  
 detector = htm.handDetect(min_dect_confidence = 0.85)
+selectionColor = (0,0,255)
 
 # -------- MAIN LOOP --------
 while True:
@@ -53,7 +54,27 @@ while True:
 
     # check which fingers are up---3
         fingers = detector.fingersUp()
-        print(fingers)
+        # print(fingers)
+
+    # if selection mode ---->> two finger are up.
+        if fingers[1] and fingers[2]:
+            Xprev,Yprev = 0,0
+            print(x1,y1)
+            if abs(x1-x2)<=50:
+                cv2.rectangle(img,(x1,y1-25),(x2,y2+25),selectionColor,cv2.FILLED)
+                if y1<=130:
+                    # overlay images here.
+                    if 10<x1<200:
+                        selectionColor = (0,0,255)
+                    elif 350<x1<550:
+                        selectionColor = (0,255,0)
+                    elif 730<x1<880:
+                        selectionColor = (230,216,173)
+                    elif 1030<x1<1280:
+                        selectionColor = (255,255,255)
+                        
+
+            print("selection mode")
 
     # setting the header image.
     img[0:HEADER_HEIGHT, 0:FRAME_WIDTH] = header
