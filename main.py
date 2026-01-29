@@ -31,6 +31,8 @@ header = cv2.resize(header, (FRAME_WIDTH, HEADER_HEIGHT))
  
 detector = htm.handDetect(min_dect_confidence = 0.85)
 selectionColor = (0,0,255)
+lineThickNess = 15
+Xprev,Yprev = 0,0
 
 # -------- MAIN LOOP --------
 while True:
@@ -75,7 +77,28 @@ while True:
                         
 
             print("selection mode")
+            # drawing mode----index finger is up.
+        if selectionColor == (255,255,255):
+            drawColor = (0,0,0)
+        else:
+            drawColor = selectionColor
+        if fingers[1] and fingers[2] == 0 and fingers[3] == 0 and fingers[4] == 0 and fingers[0] == 0 :
+            cv2.circle(img,(x1,y1),15,drawColor,cv2.FILLED)
+            print("drawing mode")
+            if Xprev==0 and Yprev==0:
+                Xprev,Yprev = x1,y1
+            cv2.line(img,(Xprev,Yprev),(x1,y1),drawColor,lineThickNess)
+            cv2.line(image_canvas,(Xprev,Yprev),(x1,y1),drawColor,lineThickNess)
+            Xprev,Yprev = x1,y1
 
+        if fingers[1] and fingers[2] == 1 and fingers[3] == 1 and fingers[4] == 1 and fingers[0] == 1:
+            cv2.line(image_canvas,(xthumb,ythumb),(xlittle,ylittle),(0,0,0),60)
+
+    imgGray = cv2.cvtColor(image_canvas,cv2.COLOR_BGR2GRAY)
+    _,imgInv = cv2.threshold(imgGray,50,255,cv2.THRESH_BINARY_INV)
+    imgInv = cv2.cvtColor(imgInv,cv2.COLOR_GRAY2BGR)
+    img = cv2.bitwise_and(img,imgInv)
+    img = cv2.bitwise_or(img,image_canvas)
     # setting the header image.
     img[0:HEADER_HEIGHT, 0:FRAME_WIDTH] = header
     # img = cv2.addWeighted(img,0.5,image_canvas,0.5,0)
