@@ -3,8 +3,8 @@ import mediapipe as mp
 import numpy as np 
 import os
 import time
-import handTracking as htm
-
+import AI_engine.handTracking as htm
+from AI_engine.stroke_manager import StrokeManager
 folderPath = "header"
 myList = os.listdir(folderPath)
 print(myList)
@@ -30,9 +30,19 @@ FRAME_WIDTH = 1280
 header = cv2.resize(header, (FRAME_WIDTH, HEADER_HEIGHT))
  
 detector = htm.handDetect(min_dect_confidence = 0.85)
+strokeManager = StrokeManager()
 selectionColor = (0,0,255)
 lineThickNess = 15
 Xprev,Yprev = 0,0
+
+# drawing Stroke Locally funtion.
+def drawLocally(stroke,img,image_canvas):
+    x1,y1 = stroke["x1"],stroke["y1"]
+    x2,y2 = stroke["x2"],stroke["y2"]
+    color = stroke["color"]
+    thickness = stroke["thickness"]
+    cv2.line(img, (x1, y1), (x2, y2), color, thickness)
+    cv2.line(image_canvas, (x1, y1), (x2, y2), color, thickness)
 
 # -------- MAIN LOOP --------
 while True:
@@ -44,7 +54,7 @@ while True:
 
     # find landmark---2
     img = detector.findHands(img)
-    lmList = detector.findPosition(img,draw=False)
+    lmList = detector.findPosition(img,draw = False)
     if len(lmList) != 0:
         # print(lmList)q
         # tip of index and middle finger.
@@ -77,19 +87,25 @@ while True:
                         
 
             print("selection mode")
-            # drawing mode----index finger is up.
+        # drawing mode----index finger is up.
         if selectionColor == (255,255,255):
             drawColor = (0,0,0)
         else:
             drawColor = selectionColor
-        if fingers[1] and fingers[2] == 0 and fingers[3] == 0 and fingers[4] == 0 and fingers[0] == 0 :
+        if fingers[1] == 1 and fingers[2] == 0 and fingers[3] == 0 and fingers[4] == 0 and fingers[0] == 0 :
             cv2.circle(img,(x1,y1),15,drawColor,cv2.FILLED)
             print("drawing mode")
-            if Xprev==0 and Yprev==0:
-                Xprev,Yprev = x1,y1
-            cv2.line(img,(Xprev,Yprev),(x1,y1),drawColor,lineThickNess)
-            cv2.line(image_canvas,(Xprev,Yprev),(x1,y1),drawColor,lineThickNess)
-            Xprev,Yprev = x1,y1
+
+            stroke = strokeManager.getStroke(x1,y1,drawColor,lineThickNess)
+            print(stroke)
+            if stroke:
+                drawLocally(stroke, img, image_canvas)
+            # if Xprev==0 and Yprev==0:
+            #     Xprev,Yprev = x1,y1
+            # # creating stroke.
+            # cv2.line(img,(Xprev,Yprev),(x1,y1),drawColor,lineThickNess)
+            # cv2.line(image_canvas,(Xprev,Yprev),(x1,y1),drawColor,lineThickNess)
+            # Xprev,Yprev = x1,y1
 
         if fingers[1] and fingers[2] == 1 and fingers[3] == 1 and fingers[4] == 1 and fingers[0] == 1:
             cv2.line(image_canvas,(xthumb,ythumb),(xlittle,ylittle),(0,0,0),60)
