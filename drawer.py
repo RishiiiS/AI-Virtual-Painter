@@ -5,7 +5,9 @@ import os
 import time
 import AI_engine.handTracking as htm
 from AI_engine.stroke_manager import StrokeManager
-folderPath = "header"
+from network.stroke_sender import StrokeSender
+from network.stroke_receiver import StrokeReceiver
+folderPath = "assets/header"
 myList = os.listdir(folderPath)
 print(myList)
 
@@ -31,6 +33,9 @@ header = cv2.resize(header, (FRAME_WIDTH, HEADER_HEIGHT))
  
 detector = htm.handDetect(min_dect_confidence = 0.85)
 strokeManager = StrokeManager()
+strokeSender = StrokeSender()
+strokeReceiver = StrokeReceiver()
+strokeReceiver.connect()
 selectionColor = (0,0,255)
 lineThickNess = 15
 Xprev,Yprev = 0,0
@@ -49,6 +54,13 @@ while True:
     # import image----1
     success, img = cap.read()
     img = cv2.flip(img,1)
+    
+    # Check for remote strokes
+    remote_stroke = strokeReceiver.get_stroke()
+    if remote_stroke:
+        print("Received remote stroke")
+        drawLocally(remote_stroke, img, image_canvas)
+
     if not success:
         break
 
@@ -100,6 +112,7 @@ while True:
             print(stroke)
             if stroke:
                 drawLocally(stroke, img, image_canvas)
+                strokeSender.send_stroke(stroke)
             # if Xprev==0 and Yprev==0:
             #     Xprev,Yprev = x1,y1
             # # creating stroke.
@@ -121,11 +134,11 @@ while True:
 
     cv2.imshow("image",img)
     # stop on pressing q.
-
     key = cv2.waitKey(1)
     if  key & 0xFF == ord("q") or key == 27:
         break
 
 cap.release()
+strokeReceiver.close()
 cv2.destroyAllWindows()
     

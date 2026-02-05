@@ -15,5 +15,5 @@ class StrokeManager():
             "thickness":thickness
         }
 
-        self.Xprev, self.yprev= x, y
+        self.Xprev, self.yprev = x, y
         return stroke
