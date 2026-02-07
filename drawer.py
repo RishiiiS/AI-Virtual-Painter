@@ -192,6 +192,11 @@ while True:
     cv2.putText(img, f"Room: {room_id}", (10, 150), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 2)
     cv2.putText(img, f"Player: {player_name}", (10, 170), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 2)
     
+    # Timer Display
+    if strokeReceiver.round_end_time:
+        time_left = max(0, int(strokeReceiver.round_end_time - time.time()))
+        cv2.putText(img, f"Time: {time_left}s", (10, 190), cv2.FONT_HERSHEY_PLAIN, 1, (255, 0, 0), 2)
+    
     # Word Display
     if strokeReceiver.current_word:
         cv2.putText(img, f"DRAW: {strokeReceiver.current_word}", (400, 100), cv2.FONT_HERSHEY_PLAIN, 3, (0, 0, 0), 4)

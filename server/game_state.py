@@ -147,15 +147,21 @@ class GameState:
             # 1. Drawer Bonus (+50)
             drawer_name = room.get('drawer')
             if drawer_name:
+                # Update ALL connections for this drawer name
                 for data in room['players'].values():
                     if data['name'] == drawer_name:
                          data['score'] += 50
-                         break
-            
-            # 2. Prepare Score Summary
-            scores = []
+                         
+            # 2. Prepare Score Summary (Unique Players)
+            unique_scores = {} # name -> score
             for data in room['players'].values():
-                scores.append((data['name'], data['score']))
+                name = data['name']
+                score = data['score']
+                # Keep the max score if there's a discrepancy (though sync should prevent it)
+                if name not in unique_scores or score > unique_scores[name]:
+                    unique_scores[name] = score
+            
+            scores = [(name, score) for name, score in unique_scores.items()]
             
             # Sort by score desc
             scores.sort(key=lambda x: x[1], reverse=True)
@@ -163,11 +169,31 @@ class GameState:
             # Reset Round State
             room['round_active'] = False
             room['guessed_players'] = set()
-            room['current_word'] = None
-            room['drawer'] = None # Optional: Keep until next start? 
-            # Protocol says START_GAME selects new drawer. So clearing is fine.
+            
+            room['drawer'] = None 
+            self.cancel_timer(room_id) # Ensure timer is cancelled if round ends manually
             
             return scores
+
+    def start_timer(self, room_id, duration, callback):
+        # Cancel existing if any
+        self.cancel_timer(room_id)
+        
+        with self.lock:
+            if room_id in self.rooms:
+                print(f"Starting {duration}s timer for {room_id}")
+                timer = threading.Timer(duration, callback, args=[room_id])
+                self.rooms[room_id]['timer'] = timer
+                timer.start()
+
+    def cancel_timer(self, room_id):
+        with self.lock:
+            if room_id in self.rooms:
+                timer = self.rooms[room_id].get('timer')
+                if timer:
+                    timer.cancel()
+                    self.rooms[room_id]['timer'] = None
+                    print(f"Cancelled timer for {room_id}")
 
     def get_player_name(self, room_id, conn):
         with self.lock:

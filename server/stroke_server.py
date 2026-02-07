@@ -91,6 +91,54 @@ def handle_client(conn, addr):
         if room_id:
             game_state.remove_client(room_id, conn)
 
+def finish_round(room_id):
+    # 1. End Round & Get Scores
+    scores = game_state.end_round(room_id)
+    if scores is None: return # Round already ended or invalid
+
+    # 2. Print Scores to Server Console
+    print(f"\n=== ROUND OVER: {room_id} ===")
+    print("SCORES:")
+    msg_payload = "ROUND OVER! SCORES:\n"
+    for name, score in scores:
+        line = f"- {name}: {score}"
+        print(line)
+        msg_payload += line + "\n"
+    
+    if scores:
+        winner = scores[0][0]
+        print(f"WINNER: {winner}")
+        msg_payload += f"WINNER: {winner}"
+    print("==========================\n")
+    
+    # 3. Broadcast Scores
+    score_msg = json.dumps({
+        Protocol.ACTION: Protocol.CHAT,
+        Protocol.PAYLOAD: msg_payload
+    })
+    broadcast(room_id, score_msg)
+    
+    # 4. Broadcast ROUND_OVER to reset clients
+    round_over_msg = json.dumps({
+        Protocol.ACTION: Protocol.ROUND_OVER
+    })
+    broadcast(room_id, round_over_msg)
+    
+    # 5. Auto-Start Next Round in 5 seconds
+    print(f"Scheduling next round for {room_id} in 5s...")
+    t = threading.Timer(5.0, handle_start_game, args=[room_id, None]) 
+    t.start()
+
+def handle_time_expiry(room_id):
+    print(f"Timer expired for {room_id}")
+    # Broadcast "Time's Up!"
+    msg = json.dumps({
+        Protocol.ACTION: Protocol.CHAT,
+        Protocol.PAYLOAD: "SYSTEM: Time's Up! No one guessed the word."
+    })
+    broadcast(room_id, msg)
+    finish_round(room_id)
+
 def process_message(room_id, message, sender_conn):
     try:
         data = json.loads(message)
@@ -117,41 +165,8 @@ def process_message(room_id, message, sender_conn):
                 })
                 broadcast(room_id, sys_msg)
                 
-                # 2. End Round & Get Scores
-                scores = game_state.end_round(room_id)
-                
-                # 3. Print Scores to Server Console
-                print(f"\n=== ROUND OVER: {room_id} ===")
-                print("SCORES:")
-                msg_payload = "ROUND OVER! SCORES:\n"
-                for name, score in scores:
-                    line = f"- {name}: {score}"
-                    print(line)
-                    msg_payload += line + "\n"
-                
-                if scores:
-                    winner = scores[0][0]
-                    print(f"WINNER: {winner}")
-                    msg_payload += f"WINNER: {winner}"
-                print("==========================\n")
-                
-                # 4. Broadcast Scores (as Chat for now)
-                score_msg = json.dumps({
-                    Protocol.ACTION: Protocol.CHAT,
-                    Protocol.PAYLOAD: msg_payload
-                })
-                broadcast(room_id, score_msg)
-                
-                # 5. Broadcast ROUND_OVER to reset clients
-                round_over_msg = json.dumps({
-                    Protocol.ACTION: Protocol.ROUND_OVER
-                })
-                broadcast(room_id, round_over_msg)
-                
-                # 6. Auto-Start Next Round in 5 seconds
-                print(f"Scheduling next round for {room_id} in 5s...")
-                t = threading.Timer(5.0, handle_start_game, args=[room_id, None]) 
-                t.start()
+                # 2. Call centralized finish_round
+                finish_round(room_id)
 
             elif result == "chat":
                 # Regular Chat
@@ -208,17 +223,23 @@ def handle_start_game(room_id, sender_conn=None):
     word = word_manager.get_random_word("easy") # Default to easy for now
     game_state.set_word(room_id, word)
     print(f"Word selected for {room_id}: {word}")
-
-    # 3. Broadcast GAME_START
-    start_msg = json.dumps({Protocol.ACTION: Protocol.GAME_START})
     
-    # 4. Broadcast DRAWER_ASSIGN
+    # 3. Start Timer (60s)
+    game_state.start_timer(room_id, 60.0, handle_time_expiry)
+
+    # 4. Broadcast GAME_START
+    start_msg = json.dumps({
+        Protocol.ACTION: Protocol.GAME_START,
+        Protocol.PAYLOAD: 60
+    })
+    
+    # 5. Broadcast DRAWER_ASSIGN
     drawer_msg = json.dumps({
         Protocol.ACTION: Protocol.DRAWER_ASSIGN,
         Protocol.PLAYER_NAME: drawer_name
     })
 
-    # 5. Send YOUR_WORD (Private to Drawer)
+    # 6. Send YOUR_WORD (Private to Drawer)
     word_msg = json.dumps({
         Protocol.ACTION: Protocol.YOUR_WORD,
         Protocol.PAYLOAD: word

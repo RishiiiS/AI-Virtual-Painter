@@ -13,6 +13,7 @@ class StrokeReceiver:
         self.client_socket = None
         self.current_drawer = None
         self.current_word = None
+        self.round_end_time = None
         
     def connect(self):
         try:
@@ -65,12 +66,16 @@ class StrokeReceiver:
                                 print(f"New Drawer: {self.current_drawer}")
                             elif action == "game_start":
                                 print("Game Started!")
+                                duration = msg.get("payload", 60)
+                                import time
+                                self.round_end_time = time.time() + float(duration)
                             elif action == "your_word":
                                 self.current_word = msg.get("payload")
                                 print(f"YOUR WORD: {self.current_word}")
                             elif action == "round_over":
                                 self.current_drawer = None
                                 self.current_word = None
+                                self.round_end_time = None
                                 print("\n=== ROUND OVER ===")
                             elif action == "chat":
                                 payload = msg.get("payload")
