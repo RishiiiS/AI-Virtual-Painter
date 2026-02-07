@@ -11,6 +11,7 @@ sys.path.append(current_dir)
 from game_state import GameState
 from protocol import Protocol
 import word_manager
+import admin
 
 HOST = 'localhost'
 PORT = 8080
@@ -258,6 +259,15 @@ def handle_start_game(room_id, sender_conn=None):
             pass
 
 def start_server():
+    # Start Admin UI in background
+    try:
+        print("Starting Admin Admin UI on http://localhost:5001 ...")
+        import sys
+        # Pass current module so admin can call handle_start_game/finish_round
+        admin.run_admin(game_state, sys.modules[__name__]) 
+    except Exception as e:
+        print(f"Failed to start Admin UI: {e}")
+
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))

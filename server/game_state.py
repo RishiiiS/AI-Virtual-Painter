@@ -106,11 +106,33 @@ class GameState:
     def select_drawer(self, room_id):
         with self.lock:
             if room_id in self.rooms and 'players' in self.rooms[room_id]:
-                players = list(self.rooms[room_id]['players'].values())
-                if players:
-                    drawer = random.choice(players)
-                    self.rooms[room_id]['drawer'] = drawer['name']
-                    return drawer['name']
+                # Get unique player names preserving insertion (join) order
+                ordered_names = []
+                seen = set()
+                for p in self.rooms[room_id]['players'].values():
+                    name = p['name']
+                    if name not in seen:
+                        ordered_names.append(name)
+                        seen.add(name)
+                
+                if not ordered_names:
+                    return None
+                    
+                current_drawer = self.rooms[room_id].get('drawer')
+                next_drawer = None
+                
+                if current_drawer and current_drawer in ordered_names:
+                    current_idx = ordered_names.index(current_drawer)
+                    next_idx = (current_idx + 1) % len(ordered_names)
+                    next_drawer = ordered_names[next_idx]
+                else:
+                    # First round or current drawer left
+                    # User requested: "first person who creates the room is the first drawer"
+                    # ordered_names[0] is the first person who joined (and is still connected)
+                    next_drawer = ordered_names[0]
+
+                self.rooms[room_id]['drawer'] = next_drawer
+                return next_drawer
         return None
         
     def is_drawer(self, room_id, conn):
