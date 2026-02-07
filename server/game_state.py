@@ -139,15 +139,14 @@ class GameState:
         with self.lock:
             if room_id in self.rooms:
                 room = self.rooms[room_id]
-                # If round is not active, maybe anyone can draw? Or no one?
-                # User req says: "When server receives a stroke: Check if sender == current drawer"
-                # If round is NOT active (lobby), maybe allow all?
-                # Let's strictly follow "Enforce drawer-only drawing" for now.
-                # If NO drawer assigned, maybe return True (lobby)?
                 
+                # Allow everyone to draw in lobby (when round is not active)
+                if not room.get('round_active', False):
+                    return True
+
                 drawer_name = room.get('drawer')
                 if not drawer_name:
-                    return True # Lobby mode / No game active
+                    return True # Should not happen if round is active, but fallback
                 
                 if 'players' in room and conn in room['players']:
                     return room['players'][conn]['name'] == drawer_name
@@ -192,7 +191,7 @@ class GameState:
             room['round_active'] = False
             room['guessed_players'] = set()
             
-            room['drawer'] = None 
+            # room['drawer'] = None  <-- REMOVED: Keep drawer set so we know who was last
             self.cancel_timer(room_id) # Ensure timer is cancelled if round ends manually
             
             return scores
