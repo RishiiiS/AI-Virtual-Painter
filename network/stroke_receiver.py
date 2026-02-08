@@ -77,6 +77,8 @@ class StrokeReceiver:
                                 self.current_word = None
                                 self.round_end_time = None
                                 print("\n=== ROUND OVER ===")
+                                # Inject Clear Canvas command
+                                self.stroke_queue.put({"action": "clear_canvas"})
                             elif action == "chat":
                                 payload = msg.get("payload")
                                 print(f"\n[CHAT] {payload}\n")

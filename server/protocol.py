@@ -11,6 +11,7 @@ class Protocol:
     DRAWER_ASSIGN = "drawer_assign"
     YOUR_WORD = "your_word"
     ROUND_OVER = "round_over"
+    CLEAR_CANVAS = "clear_canvas"
     
     # Keys
     ACTION = "action"

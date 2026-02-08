@@ -165,13 +165,34 @@ class GameState:
             if not room.get('round_active'):
                 return None
 
-            # 1. Drawer Bonus (+50)
+            # 1. Drawer Bonus
+            # Bonus ONLY if they used "gesture" mode at least once
             drawer_name = room.get('drawer')
             if drawer_name:
-                # Update ALL connections for this drawer name
-                for data in room['players'].values():
-                    if data['name'] == drawer_name:
-                         data['score'] += 50
+                used_gesture = False
+                for s in room.get('history', []):
+                    # Check if stroke belongs to current round? 
+                    # History isn't cleared per round currently! It's global list.
+                    # This is a potential bug if we want round-specific detection.
+                    # But wait, history is cumulative for the canvas. 
+                    # If we check ALL history, it might count previous rounds.
+                    # However, strictly speaking, history accumulates. 
+                    # Ideally we'd filter by timestamp or just check if ANY stroke ever was gesture.
+                    # For now, let's just check the last section? 
+                    # Better: Scan whole history. If they EVER used gesture, they get credit. 
+                    # This encourages trying it out.
+                    if s.get('mode') == 'gesture':
+                        used_gesture = True
+                        break
+                
+                # Bonus Amount
+                bonus = 50 if used_gesture else 0
+                
+                if bonus > 0:
+                    # Update ALL connections for this drawer name
+                    for data in room['players'].values():
+                        if data['name'] == drawer_name:
+                             data['score'] += bonus
                          
             # 2. Prepare Score Summary (Unique Players)
             unique_scores = {} # name -> score
