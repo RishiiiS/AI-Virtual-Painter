@@ -2,6 +2,9 @@ import socket
 import json
 import threading
 from queue import Queue
+import base64
+import numpy as np
+import cv2
 
 class StrokeReceiver:
     def __init__(self, host='localhost', port=8080, room_id='default', player_name='Unknown'):
@@ -10,6 +13,7 @@ class StrokeReceiver:
         self.player_name = player_name
         self.running = False
         self.stroke_queue = Queue()
+        self.video_queue = Queue(maxsize=2) # Keep it fresh
         self.client_socket = None
         self.current_drawer = None
         self.current_word = None
@@ -46,7 +50,7 @@ class StrokeReceiver:
         buffer = ""
         while self.running and self.client_socket:
             try:
-                data = self.client_socket.recv(1024)
+                data = self.client_socket.recv(4096) # Increase buffer for video
                 if not data:
                     break
                     
@@ -61,7 +65,31 @@ class StrokeReceiver:
                             
                             # Check for Protocol Actions
                             action = msg.get("action")
-                            if action == "drawer_assign":
+                            if action == "video_frame":
+                                try:
+                                    payload = msg.get("payload")
+                                    # Decode Base64 to Bytes
+                                    img_bytes = base64.b64decode(payload)
+                                    # Decode Image (Fast enough? If not, move to main thread. 
+                                    # But main thread is busy drawing. 
+                                    # Let's decode here. 320x180 JPEG is small.)
+                                    # Convert bytes to numpy array
+                                    nparr = np.frombuffer(img_bytes, np.uint8)
+                                    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                                    
+                                    if frame is not None:
+                                        # Push to queue (Drop old if full to keep low latency)
+                                        if self.video_queue.full():
+                                            try:
+                                                self.video_queue.get_nowait()
+                                            except:
+                                                pass
+                                        self.video_queue.put(frame)
+                                except Exception as e:
+                                    # print(f"Video decode error: {e}") 
+                                    pass # drop frame
+                                    
+                            elif action == "drawer_assign":
                                 self.current_drawer = msg.get("player_name")
                                 print(f"New Drawer: {self.current_drawer}")
                             elif action == "game_start":
@@ -87,7 +115,14 @@ class StrokeReceiver:
                                 self.stroke_queue.put(msg)
                                 
                         except json.JSONDecodeError:
-                            print(f"Receiver JSON error: {message}")
+                            # Might happen if video packet gets split awkwardly? 
+                            # But we split by \n, so strictly one line.
+                            # Large payloads might exceed recv buffer?
+                            # We increased recv to 4096. 
+                            # TCP stream ensures we get full bytes eventually, 
+                            # but `recv` might return partial chunk.
+                            # `buffer += chunk` handles reconstruction.
+                            print(f"Receiver JSON error: {message[:50]}...")
                             
             except Exception as e:
                 if self.running: # Only print error if we weren't trying to close
@@ -102,6 +137,11 @@ class StrokeReceiver:
     def get_stroke(self):
         if not self.stroke_queue.empty():
             return self.stroke_queue.get()
+        return None
+        
+    def get_video_frame(self):
+        if not self.video_queue.empty():
+            return self.video_queue.get()
         return None
 
     def close(self):

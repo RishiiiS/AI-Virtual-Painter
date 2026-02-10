@@ -12,6 +12,7 @@ class Protocol:
     YOUR_WORD = "your_word"
     ROUND_OVER = "round_over"
     CLEAR_CANVAS = "clear_canvas"
+    VIDEO_FRAME = "video_frame"
     
     # Keys
     ACTION = "action"

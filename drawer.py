@@ -6,6 +6,7 @@ import os
 import time
 import sys
 import json
+import base64
 
 # Add server directory to path to import Protocol
 sys.path.append(os.path.join(os.path.dirname(__file__), 'server'))
@@ -31,11 +32,74 @@ for imPath in myList:
 
 header = overlayList[0]
 
+# -------- WEBCAM STREAM CLASS --------
+class WebcamStream:
+    def __init__(self, src=0):
+        self.stream = None
+        self.src = src
+        self.stopped = True
+        self.thread = None
+        self.lock = threading.Lock()
+
+    def start(self):
+        if not self.stopped:
+            return self
+            
+        self.stream = cv2.VideoCapture(self.src)
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        
+        (self.grabbed, self.frame) = self.stream.read()
+        if not self.grabbed:
+             print("Failed to open camera")
+             self.stream.release()
+             return self
+
+        self.stopped = False
+        self.thread = threading.Thread(target=self.update, args=())
+        self.thread.start()
+        return self
+
+    def update(self):
+        while True:
+            if self.stopped:
+                return
+
+            (grabbed, frame) = self.stream.read()
+            with self.lock:
+                self.grabbed = grabbed
+                self.frame = frame
+
+    def read(self):
+        with self.lock:
+            if self.frame is None:
+                return False, None
+            return self.grabbed, self.frame.copy()
+
+    def stop(self):
+        self.stopped = True
+        if self.thread is not None and self.thread.is_alive():
+            self.thread.join()
+        
+        if self.stream:
+             self.stream.release()
+
 # -------- CAMERA --------
-cap = cv2.VideoCapture(0)
+# -------- CAMERA --------
+# Initialize Webcam Stream (but don't start yet)
+# Initialize Webcam Stream (but don't start yet)
+webcam_stream = WebcamStream(src=0)
 image_canvas = np.ones((720, 1280, 3), dtype=np.uint8) * 255
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+# Video Constants
+VIDEO_WIDTH = 320
+VIDEO_HEIGHT = 180
+VIDEO_FPS = 10
+VIDEO_INTERVAL = 1.0 / VIDEO_FPS
+last_video_time = 0
+small_frame_to_send = None 
+last_remote_frame = None 
+last_remote_frame_time = 0 
 
 # -------- RESIZE HEADER ONCE --------
 HEADER_HEIGHT = 100
@@ -70,6 +134,7 @@ print("1. To START GAME: Press 's' on the CAMERA WINDOW (not here).")
 print("2. To CHAT/GUESS: Type here in the terminal.")
 print("="*40 + "\n")
 
+
 def chat_input_thread():
     print("Chat enabled! Type in console to guess/chat.")
     while True:
@@ -82,8 +147,8 @@ def chat_input_thread():
                     "player_name": player_name,
                     "payload": msg
                 }
-                # Use strokeSender socket to send
-                strokeSender.client_socket.sendall((json.dumps(chat_packet) + "\n").encode('utf-8'))
+                # Use strokeSender to send (Thread Safe)
+                strokeSender.send_data(chat_packet)
         except EOFError:
             break
         except Exception as e:
@@ -163,14 +228,71 @@ cv2.setMouseCallback("Image", draw_mouse)
 
 # -------- MAIN LOOP --------
 while True:
-    # import image----1
-    success, img = cap.read()
-    if not success:
-        break
+    # 0. Determine Role First
+    if strokeReceiver.current_drawer:
+        is_drawer = (player_name == strokeReceiver.current_drawer)
+    else:
+        # If no drawer assigned (Lobby/Intermission), default to GUESSER mode (Safety first)
+        # This prevents everyone's camera turning on during breaks.
+        is_drawer = False 
+
+    # 1. Camera & Video Logic (STRICT SEPARATION)
+    if is_drawer:
+        # --- DRAWER PATH ---
+        # 1. Ensure Camera Running
+        if webcam_stream.stopped:
+            webcam_stream.start()
         
-    img = cv2.flip(img,1)
-    # Force resize to match canvas dimensions (1280x720) to ensure coordinate alignment
-    img = cv2.resize(img, (1280, 720))
+        # 2. Capture Frame
+        success, img = webcam_stream.read()
+        if not success or img is None:
+            img = np.zeros((720, 1280, 3), dtype=np.uint8)
+        else:
+            img = cv2.flip(img, 1)
+            if img.shape[1] != 1280 or img.shape[0] != 720:
+                img = cv2.resize(img, (1280, 720))
+
+        # 3. Send Video (Throttled)
+        current_time = time.time()
+        if current_time - last_video_time > VIDEO_INTERVAL:
+            # Resize
+            small_frame_to_send = cv2.resize(img, (VIDEO_WIDTH, VIDEO_HEIGHT))
+            
+            # Encode
+            _, buffer = cv2.imencode('.jpg', small_frame_to_send, [int(cv2.IMWRITE_JPEG_QUALITY), 50])
+            jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+            
+            # Send
+            video_packet = {
+                "action": Protocol.VIDEO_FRAME,
+                "room_id": room_id,
+                "player_name": player_name,
+                "payload": jpg_as_text
+            }
+            if strokeSender:
+                strokeSender.send_video(video_packet)
+            
+            last_video_time = current_time
+
+    else:
+        # --- GUESSER PATH ---
+        # 1. Ensure Camera STOPPED
+        if not webcam_stream.stopped:
+            webcam_stream.stop()
+            
+        # 2. Receive Video (Check for new frames)
+        new_frame = strokeReceiver.get_video_frame()
+        if new_frame is not None:
+             last_remote_frame = new_frame
+             last_remote_frame_time = time.time()
+        
+        # 3. Timeout Cleanup (3s)
+        if time.time() - last_remote_frame_time > 3.0:
+            last_remote_frame = None
+
+        # 4. Dummy Img (Guesser doesn't process own camera)
+        img = np.zeros((720, 1280, 3), dtype=np.uint8)
+        success = True
     
     # Check for remote strokes
     while True:
@@ -186,14 +308,10 @@ while True:
             
         drawLocally(remote_stroke, img, image_canvas)
         
-    # Determine is_drawer
-    if strokeReceiver.current_drawer:
-        is_drawer = (player_name == strokeReceiver.current_drawer)
-    else:
-        is_drawer = True 
-
-    if not success:
-        break
+    if not success and is_drawer:
+         pass # Don't break loop if camera flickers, just keep trying or show black
+         # print("Camera failed")
+         # break
 
     # find landmark---2
     lmList = []
@@ -273,18 +391,42 @@ while True:
     h, w, _ = img.shape
     pip_w = 320
     pip_h = 180
-    pip_img = cv2.resize(img, (pip_w, pip_h))
     
-    # Position: Top Right (below header? or just top right overlaying header?)
+    if is_drawer:
+        # Drawer sees a placeholder, not themselves
+        pip_img = np.zeros((pip_h, pip_w, 3), dtype=np.uint8)
+        pip_img[:] = (30, 30, 30) # Dark gray background
+        cv2.putText(pip_img, "You are being", (60, 80), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 255, 255), 2)
+        cv2.putText(pip_img, "watched!", (100, 110), cv2.FONT_HERSHEY_PLAIN, 1.5, (255, 255, 255), 2)
+    else:
+        if last_remote_frame is not None:
+             # Remote frame is already 320x180, but just in case
+             if last_remote_frame.shape[1] != pip_w or last_remote_frame.shape[0] != pip_h:
+                 pip_img = cv2.resize(last_remote_frame, (pip_w, pip_h))
+             else:
+                 pip_img = last_remote_frame
+        else:
+             # Placeholder (Black box)
+             pip_img = np.zeros((pip_h, pip_w, 3), dtype=np.uint8)
+             cv2.putText(pip_img, "NO VIDEO", (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1)
+    
+    # Position: Top Right (below header)
     # Header is 100px.
-    # Let's put it Top Right, below header.
-    # img_display[100:100+pip_h, 1280-pip_w:1280] = pip_img 
-    # Actually, user might want to see themselves clearly.
-    # Let's put it Bottom Right.
-    img_display[720-pip_h:720, 1280-pip_w:1280] = pip_img
+    # Video box size: 320x180
+    pip_x1 = 1280 - pip_w - 10
+    pip_y1 = HEADER_HEIGHT + 10
+    pip_x2 = 1280 - 10
+    pip_y2 = HEADER_HEIGHT + 10 + pip_h
     
-    # Draw a border around PIP
-    cv2.rectangle(img_display, (1280-pip_w, 720-pip_h), (1280, 720), (50, 50, 50), 3)
+    img_display[pip_y1:pip_y2, pip_x1:pip_x2] = pip_img
+    
+    # Draw Border
+    cv2.rectangle(img_display, (pip_x1, pip_y1), (pip_x2, pip_y2), (50, 50, 50), 3)
+    
+    # Draw Label "DRAWER"
+    # Background for label
+    cv2.rectangle(img_display, (pip_x1, pip_y1 - 25), (pip_x1 + 100, pip_y1), (50, 50, 50), cv2.FILLED)
+    cv2.putText(img_display, "DRAWER", (pip_x1 + 10, pip_y1 - 5), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1)
 
     # 3. Overlay: UI Elements (Header)
     img_display[0:HEADER_HEIGHT, 0:FRAME_WIDTH] = header
@@ -358,12 +500,12 @@ while True:
                 "player_name": player_name
             }
             try:
-                msg_str = json.dumps(msg) + "\n"
-                strokeSender.client_socket.sendall(msg_str.encode('utf-8'))
+                strokeSender.send_data(msg)
             except Exception as e:
                 print(f"Failed to start game: {e}")
 
-cap.release()
+if not webcam_stream.stopped:
+    webcam_stream.stop()
 strokeReceiver.close()
 cv2.destroyAllWindows()
     

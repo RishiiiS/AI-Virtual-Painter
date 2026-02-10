@@ -1,5 +1,7 @@
 import threading
 import random
+import json
+import time
 
 class GameState:
     def __init__(self):
@@ -17,9 +19,86 @@ class GameState:
                     'current_word': None,
                     'guessed_players': set(),
                     'round_active': False,
-                    'drawer': None
+                    'drawer': None,
+                    'drawer_queue': [], # List of names
+                    'round_start_time': 0,
+                    'round_duration': 60
                 }
                 print(f"Created new room: {room_id}")
+
+    # ... (add_client, remove_client, etc. remain same, skipping to select_drawer) ...
+
+    def select_drawer(self, room_id):
+        with self.lock:
+            if room_id in self.rooms and 'players' in self.rooms[room_id]:
+                room = self.rooms[room_id]
+                
+                # Check Queue
+                if not room['drawer_queue']:
+                    # Refill Queue (Round Robin)
+                    # We use insertion order from players dict values
+                    # Or sort by name for consistency? User said "repeat same queue".
+                    # Let's verify existing players.
+                    current_player_names = [p['name'] for p in room['players'].values()]
+                    
+                    if not current_player_names:
+                        return None
+                        
+                    # Sort to ensure consistent order across resets? 
+                    # Or just shuffle once? 
+                    # "one by one then repeat".
+                    # Let's just take current players.
+                    room['drawer_queue'] = list(current_player_names)
+                    # Optional: Shuffle if it's a fresh queue? 
+                    # User didn't explicitly ask for random, but usually games are random order then repeat.
+                    # Let's keep it simple: Sorted or Insertion. 
+                    # Python dict preserves insertion order since 3.7.
+                    
+                # Pop next
+                # Validate player is still here
+                while room['drawer_queue']:
+                    next_drawer = room['drawer_queue'].pop(0)
+                    # Check if this player is still in room
+                    player_exists = False
+                    for p in room['players'].values():
+                        if p['name'] == next_drawer:
+                            player_exists = True
+                            break
+                    
+                    if player_exists:
+                         room['drawer'] = next_drawer
+                         return next_drawer
+                
+                # If we ran out (everyone in queue left), try to refill immediately
+                # (Recursive call one level deep effectively)
+                # But let's just fail safe
+                return None
+                
+        return None
+
+    def start_timer(self, room_id, duration, callback):
+        # Cancel existing if any
+        self.cancel_timer(room_id)
+        
+        with self.lock:
+            if room_id in self.rooms:
+                print(f"Starting {duration}s timer for {room_id}")
+                timer = threading.Timer(duration, callback, args=[room_id])
+                self.rooms[room_id]['timer'] = timer
+                self.rooms[room_id]['round_start_time'] = time.time()
+                self.rooms[room_id]['round_duration'] = duration
+                timer.start()
+
+    def get_time_remaining(self, room_id):
+        with self.lock:
+            if room_id in self.rooms and self.rooms[room_id].get('round_active'):
+                start = self.rooms[room_id].get('round_start_time', 0)
+                duration = self.rooms[room_id].get('round_duration', 60)
+                elapsed = time.time() - start
+                remaining = max(0, duration - elapsed)
+                return int(remaining)
+        return 0
+
 
     def add_client(self, room_id, conn, player_name="Unknown"):
         self.create_room_if_missing(room_id)
@@ -106,33 +185,43 @@ class GameState:
     def select_drawer(self, room_id):
         with self.lock:
             if room_id in self.rooms and 'players' in self.rooms[room_id]:
-                # Get unique player names preserving insertion (join) order
-                ordered_names = []
-                seen = set()
-                for p in self.rooms[room_id]['players'].values():
-                    name = p['name']
-                    if name not in seen:
-                        ordered_names.append(name)
-                        seen.add(name)
+                room = self.rooms[room_id]
                 
-                if not ordered_names:
-                    return None
+                # Check Queue
+                if not room.get('drawer_queue'):
+                    # Refill Queue (Round Robin)
+                    # We use insertion order from players dict values
+                    current_player_names = []
+                    seen = set()
+                    for p in room['players'].values():
+                        name = p['name']
+                        if name not in seen:
+                            current_player_names.append(name)
+                            seen.add(name)
+                            
+                    if not current_player_names:
+                        return None
+                        
+                    room['drawer_queue'] = list(current_player_names)
+                    print(f"Refilled drawer queue for {room_id}: {room['drawer_queue']}")
                     
-                current_drawer = self.rooms[room_id].get('drawer')
-                next_drawer = None
+                # Pop next
+                # Validate player is still here
+                while room['drawer_queue']:
+                    next_drawer = room['drawer_queue'].pop(0)
+                    # Check if this player is still in room
+                    player_exists = False
+                    for p in room['players'].values():
+                        if p['name'] == next_drawer:
+                            player_exists = True
+                            break
+                    
+                    if player_exists:
+                         room['drawer'] = next_drawer
+                         return next_drawer
                 
-                if current_drawer and current_drawer in ordered_names:
-                    current_idx = ordered_names.index(current_drawer)
-                    next_idx = (current_idx + 1) % len(ordered_names)
-                    next_drawer = ordered_names[next_idx]
-                else:
-                    # First round or current drawer left
-                    # User requested: "first person who creates the room is the first drawer"
-                    # ordered_names[0] is the first person who joined (and is still connected)
-                    next_drawer = ordered_names[0]
-
-                self.rooms[room_id]['drawer'] = next_drawer
-                return next_drawer
+                # If list exhausted (all left), fallback
+                return None
         return None
         
     def is_drawer(self, room_id, conn):
@@ -170,20 +259,15 @@ class GameState:
             drawer_name = room.get('drawer')
             if drawer_name:
                 used_gesture = False
-                for s in room.get('history', []):
+                for s_str in room.get('history', []):
                     # Check if stroke belongs to current round? 
-                    # History isn't cleared per round currently! It's global list.
-                    # This is a potential bug if we want round-specific detection.
-                    # But wait, history is cumulative for the canvas. 
-                    # If we check ALL history, it might count previous rounds.
-                    # However, strictly speaking, history accumulates. 
-                    # Ideally we'd filter by timestamp or just check if ANY stroke ever was gesture.
-                    # For now, let's just check the last section? 
-                    # Better: Scan whole history. If they EVER used gesture, they get credit. 
-                    # This encourages trying it out.
-                    if s.get('mode') == 'gesture':
-                        used_gesture = True
-                        break
+                    try:
+                        s = json.loads(s_str)
+                        if s.get('mode') == 'gesture':
+                            used_gesture = True
+                            break
+                    except:
+                        pass
                 
                 # Bonus Amount
                 bonus = 50 if used_gesture else 0
@@ -192,7 +276,7 @@ class GameState:
                     # Update ALL connections for this drawer name
                     for data in room['players'].values():
                         if data['name'] == drawer_name:
-                             data['score'] += bonus
+                            data['score'] += bonus
                          
             # 2. Prepare Score Summary (Unique Players)
             unique_scores = {} # name -> score
@@ -212,7 +296,7 @@ class GameState:
             room['round_active'] = False
             room['guessed_players'] = set()
             
-            # room['drawer'] = None  <-- REMOVED: Keep drawer set so we know who was last
+            room['drawer'] = None  # Clear drawer so video stops broadcasting in lobby
             self.cancel_timer(room_id) # Ensure timer is cancelled if round ends manually
             
             return scores
@@ -226,7 +310,19 @@ class GameState:
                 print(f"Starting {duration}s timer for {room_id}")
                 timer = threading.Timer(duration, callback, args=[room_id])
                 self.rooms[room_id]['timer'] = timer
+                self.rooms[room_id]['round_start_time'] = time.time()
+                self.rooms[room_id]['round_duration'] = duration
                 timer.start()
+
+    def get_time_remaining(self, room_id):
+        with self.lock:
+            if room_id in self.rooms and self.rooms[room_id].get('round_active'):
+                start = self.rooms[room_id].get('round_start_time', 0)
+                duration = self.rooms[room_id].get('round_duration', 60)
+                elapsed = time.time() - start
+                remaining = max(0, duration - elapsed)
+                return int(remaining)
+        return 0
 
     def cancel_timer(self, room_id):
         with self.lock:
@@ -243,6 +339,12 @@ class GameState:
                 if conn in self.rooms[room_id]['players']:
                     return self.rooms[room_id]['players'][conn]['name']
         return "Unknown"
+
+    def get_drawer_name(self, room_id):
+        with self.lock:
+            if room_id in self.rooms:
+                return self.rooms[room_id].get('drawer')
+        return None
 
     def process_guess(self, room_id, conn, guess):
         with self.lock:

@@ -62,6 +62,26 @@ def handle_client(conn, addr):
             except:
                 break
 
+        # 3.5 Sync Late Joiner
+        if game_state.is_round_active(room_id):
+            remaining_time = game_state.get_time_remaining(room_id)
+            current_drawer = game_state.get_drawer_name(room_id)
+            
+            # Send GAME_START with remaining time
+            start_msg = json.dumps({
+                Protocol.ACTION: Protocol.GAME_START,
+                Protocol.PAYLOAD: remaining_time
+            })
+            conn.sendall((start_msg + "\n").encode('utf-8'))
+            
+            # Send DRAWER_ASSIGN
+            if current_drawer:
+                drawer_msg = json.dumps({
+                    Protocol.ACTION: Protocol.DRAWER_ASSIGN,
+                    Protocol.PLAYER_NAME: current_drawer
+                })
+                conn.sendall((drawer_msg + "\n").encode('utf-8'))
+
         # 4. Main Loop (Broadcast)
         while True:
             while "\n" in buffer:
@@ -93,9 +113,17 @@ def handle_client(conn, addr):
             game_state.remove_client(room_id, conn)
 
 def finish_round(room_id):
+    print(f"DEBUG: finish_round called for {room_id}")
     # 1. End Round & Get Scores
-    scores = game_state.end_round(room_id)
-    if scores is None: return # Round already ended or invalid
+    try:
+        scores = game_state.end_round(room_id)
+    except Exception as e:
+        print(f"ERROR in end_round: {e}")
+        scores = None
+        
+    if scores is None: 
+        print("DEBUG: end_round returned None (Round not active?)")
+        return # Round already ended or invalid
 
     # 2. Print Scores to Server Console
     print(f"\n=== ROUND OVER: {room_id} ===")
@@ -120,6 +148,7 @@ def finish_round(room_id):
     broadcast(room_id, score_msg)
     
     # 4. Broadcast ROUND_OVER to reset clients
+    print("DEBUG: Broadcasting ROUND_OVER")
     round_over_msg = json.dumps({
         Protocol.ACTION: Protocol.ROUND_OVER
     })
@@ -178,6 +207,20 @@ def process_message(room_id, message, sender_conn):
                 # Broadcast to EVERYONE (including sender) so they know it was sent/received
                 broadcast(room_id, chat_msg, exclude_conn=None)
             return
+
+        # VIDEO FRAME (Stateless, High Frequency)
+        if action == Protocol.VIDEO_FRAME:
+             # Strict Enforcement: Video ONLY during active rounds
+             if not game_state.is_round_active(room_id):
+                 return
+
+             # Validate Drawer (Only drawer can stream)
+             if not game_state.is_drawer(room_id, sender_conn):
+                 return
+             
+             # Broadcast immediately (No history)
+             broadcast(room_id, message, exclude_conn=sender_conn)
+             return
 
         # STROKE or other (Implicitly STROKE for legacy/default)
         # Validate Drawer for Drawing
