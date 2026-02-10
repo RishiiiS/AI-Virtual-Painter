@@ -237,6 +237,18 @@ def process_message(room_id, message, sender_conn):
         pass
 
 def broadcast(room_id, message, exclude_conn=None):
+    # Save to history if it's a chat message
+    try:
+        data = json.loads(message)
+        if data.get(Protocol.ACTION) == Protocol.CHAT:
+            payload = data.get(Protocol.PAYLOAD)
+            # We want to store the formatted payload, but we only have raw payload here usually.
+            # Actually, process_message constructs the full chat message (name + payload).
+            # So `message` here IS the final broadcast message.
+            game_state.append_chat(room_id, payload)
+    except:
+        pass
+
     clients = game_state.get_clients(room_id)
     # print(f"Broadcasting to {len(clients)} clients in {room_id}")
     for client in clients:

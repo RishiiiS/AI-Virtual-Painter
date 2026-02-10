@@ -22,7 +22,8 @@ class GameState:
                     'drawer': None,
                     'drawer_queue': [], # List of names
                     'round_start_time': 0,
-                    'round_duration': 60
+                    'round_duration': 60,
+                    'chat_history': [] 
                 }
                 print(f"Created new room: {room_id}")
 
@@ -141,6 +142,16 @@ class GameState:
         with self.lock:
             if room_id in self.rooms:
                 self.rooms[room_id]['history'].append(stroke_data)
+
+    def append_chat(self, room_id, message):
+        with self.lock:
+            if room_id in self.rooms:
+                # Store tuple: (timestamp, message) or just message?
+                # Just message for now, simple string or dict
+                self.rooms[room_id]['chat_history'].append(message)
+                # Cap history? 
+                if len(self.rooms[room_id]['chat_history']) > 100:
+                    self.rooms[room_id]['chat_history'].pop(0)
 
     def get_clients(self, room_id):
         with self.lock:

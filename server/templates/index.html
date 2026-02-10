@@ -1,34 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Painter Admin</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; color: #333; padding: 20px; }
-        h1 { color: #444; }
-        .room-card { background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
-        .room-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
-        .room-title { font-size: 1.25em; font-weight: bold; color: #007bff; }
-        .status { font-weight: bold; padding: 5px 10px; border-radius: 4px; font-size: 0.9em; }
-        .status.active { background-color: #d4edda; color: #155724; }
-        .status.waiting { background-color: #fff3cd; color: #856404; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #eee; }
-        th { background-color: #f8f9fa; color: #666; font-size: 0.9em; }
-        
-        button { cursor: pointer; padding: 6px 12px; border: none; border-radius: 4px; font-size: 0.9em; transition: background 0.2s; }
-        .btn-start { background-color: #28a745; color: white; }
-        .btn-start:hover { background-color: #218838; }
-        .btn-end { background-color: #ffc107; color: #333; }
-        .btn-end:hover { background-color: #e0a800; }
-        .btn-kick { background-color: #dc3545; color: white; padding: 4px 8px; font-size: 0.8em; }
-        .btn-kick:hover { background-color: #c82333; }
-        
-        .controls { display: flex; gap: 10px; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            padding: 20px;
+        }
+
+        h1 {
+            color: #444;
+        }
+
+        .room-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .room-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .room-title {
+            font-size: 1.25em;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        .status.active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status.waiting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        button {
+            cursor: pointer;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.9em;
+            transition: background 0.2s;
+        }
+
+        .btn-start {
+            background-color: #28a745;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background-color: #218838;
+        }
+
+        .btn-end {
+            background-color: #ffc107;
+            color: #333;
+        }
+
+        .btn-end:hover {
+            background-color: #e0a800;
+        }
+
+        .btn-kick {
+            background-color: #dc3545;
+            color: white;
+            padding: 4px 8px;
+            font-size: 0.8em;
+        }
+
+        .btn-kick:hover {
+            background-color: #c82333;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
     </style>
 </head>
+
 <body>
     <h1>🎨 AI Painter Admin Control</h1>
     <div id="rooms-container">Loading...</div>
@@ -44,7 +136,7 @@
             }
         }
 
-        async function performAction(action, roomId, addr=null) {
+        async function performAction(action, roomId, addr = null) {
             const payload = { action, room_id: roomId, addr };
             await fetch('/api/action', {
                 method: 'POST',
@@ -60,7 +152,7 @@
                 container.innerHTML = "<p>No active rooms.</p>";
                 return;
             }
-            
+
             container.innerHTML = Object.entries(rooms).map(([roomId, room]) => `
                 <div class="room-card">
                     <div class="room-header">
@@ -72,10 +164,10 @@
                             <span class="status ${room.round_active ? 'active' : 'waiting'}">
                                 ${room.round_active ? 'PLAYING' : 'LOBBY'}
                             </span>
-                            ${room.round_active 
-                                ? `<button class="btn-end" onclick="performAction('end_round', '${roomId}')">End Round</button>`
-                                : `<button class="btn-start" onclick="performAction('start_game', '${roomId}')">Start Game</button>`
-                            }
+                            ${room.round_active
+                    ? `<button class="btn-end" onclick="performAction('end_round', '${roomId}')">End Round</button>`
+                    : `<button class="btn-start" onclick="performAction('start_game', '${roomId}')">Start Game</button>`
+                }
                         </div>
                     </div>
                     
@@ -108,13 +200,28 @@
                             `).join('')}
                         </tbody>
                     </table>
+                    <div class="chat-section" style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 10px;">
+                        <strong>Chat Room</strong>
+                        <div class="chat-box" id="chat-${roomId}" style="height: 150px; overflow-y: auto; background: #f9f9f9; border: 1px solid #ddd; padding: 10px; margin-bottom: 5px; font-size: 0.9em;">
+                            ${(room.chat_history || []).map(msg => `<div>${msg}</div>`).join('')}
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <input type="text" id="input-${roomId}" placeholder="Type message..." style="flex: 1; padding: 5px;">
+                            <button onclick="sendChat('${roomId}')" style="background: #007bff; color: white;">Send</button>
+                        </div>
+                    </div>
                 </div>
             `).join('');
         }
 
         // Poll every 2 seconds
-        setInterval(fetchState, 2000);
+        setInterval(() => {
+            // Don't refresh if user is typing in any input
+            if (document.activeElement.tagName === 'INPUT') return;
+            fetchState();
+        }, 2000);
         fetchState();
     </script>
 </body>
+
 </html>

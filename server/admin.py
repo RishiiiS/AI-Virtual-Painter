@@ -67,7 +67,8 @@ def get_state():
                 "drawer": room_data.get('drawer'),
                 "current_word": room_data.get('current_word'),
                 "player_count": len(players_list), # Unique count
-                "players": players_list
+                "players": players_list,
+                "chat_history": room_data.get('chat_history', [])
             }
             
     return jsonify(state_dump)
@@ -126,8 +127,21 @@ def perform_action():
                     kicked_count += 1
                     
         return jsonify({"status": "kicked", "count": kicked_count})
-                    
-        return jsonify({"error": "Player not found"}), 404
+
+    elif action == "send_chat":
+        message = data.get('message')
+        if not message:
+            return jsonify({"error": "No message"}), 400
+            
+        # Broadcast via stroke_server's broadcast method
+        # We need to access the broadcast function. 
+        # Since stroke_server_module is imported, we can use it.
+        chat_msg = json.dumps({
+            Protocol.ACTION: Protocol.CHAT,
+            Protocol.PAYLOAD: f"ADMIN: {message}"
+        })
+        stroke_server_module.broadcast(room_id, chat_msg)
+        return jsonify({"status": "sent"})
 
     return jsonify({"error": "Invalid action"}), 400
 
