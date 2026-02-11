@@ -4,7 +4,9 @@ export const getState = async () => {
     try {
         const res = await fetch(`${API_URL}/state`);
         if (!res.ok) throw new Error('Network response was not ok');
-        return await res.json();
+        const data = await res.json();
+        // console.log("State fetched:", data); 
+        return data;
     } catch (e) {
         console.error("Fetch state error:", e);
         return null; // Return null on error
@@ -29,8 +31,9 @@ export const sendChat = async (roomId, message, sender) => {
 };
 
 export const startGame = async (roomId) => {
+    console.log("Found roomId for start:", roomId);
     try {
-        await fetch(`${API_URL}/action`, {
+        const res = await fetch(`${API_URL}/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -38,6 +41,8 @@ export const startGame = async (roomId) => {
                 room_id: roomId
             })
         });
+        const json = await res.json();
+        console.log("Start Game Response:", json);
     } catch (e) {
         console.error("Start game error:", e);
     }

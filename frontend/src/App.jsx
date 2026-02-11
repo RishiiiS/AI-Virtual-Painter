@@ -6,25 +6,48 @@ import AvatarSelector from './components/AvatarSelector'
 import NicknameInput from './components/NicknameInput'
 import ActionButtons from './components/ActionButtons'
 import Footer from './components/Footer'
+import Game from './Game'
 import Lobby from './Lobby'
-
 import JoinRoom from './components/JoinRoom'
 
 function App() {
-  const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join'
+  const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join' | 'game'
   const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState('room1'); // Default
   const [isHost, setIsHost] = useState(false);
 
-  if (view === 'lobby') {
+  if (view === 'game') {
     return (
       <div className="app-container" style={{ maxWidth: '100%', height: '100vh', justifyContent: 'flex-start' }}>
+        {/* Same background shapes */}
+        <div className="shape shape-triangle-tl"></div>
+        <div className="shape shape-rect-br"></div>
+        <div className="shape shape-circle-br"></div>
+        <div className="shape shape-rect-bl"></div>
+        <Game
+          playerName={nickname || "WebPlayer"}
+          roomId={roomId}
+          onEndGame={() => setView('landing')}
+        />
+      </div>
+    );
+  }
+
+  if (view === 'lobby') {
+    return (
+      <div className="app-container" style={{ maxWidth: '100%', height: '100vh', justifyContent: 'center' }}>
         {/* Same background shapes as Landing Page */}
         <div className="shape shape-triangle-tl"></div>
         <div className="shape shape-rect-br"></div>
         <div className="shape shape-circle-br"></div>
         <div className="shape shape-rect-bl"></div>
-        <Lobby playerName={nickname || "WebPlayer"} roomId={roomId} setRoomId={setRoomId} isHost={isHost} />
+        <Lobby
+          playerName={nickname || "WebPlayer"}
+          roomId={roomId}
+          setRoomId={setRoomId}
+          isHost={isHost}
+          onGameStart={() => setView('game')}
+        />
       </div>
     );
   }
@@ -95,7 +118,7 @@ function App() {
         </div>
 
         <Footer />
-      </div>
+      </div >
     </>
   )
 }

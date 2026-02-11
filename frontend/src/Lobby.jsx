@@ -6,7 +6,7 @@ import SettingsPanel from './components/SettingsPanel';
 import ChatPanel from './components/ChatPanel';
 import { getState, sendChat, startGame } from './api';
 
-const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost = false }) => {
+const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost = false, onGameStart }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [players, setPlayers] = useState([]); // Need to update PlayerList to accept this
 
@@ -14,6 +14,11 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
     const interval = setInterval(async () => {
       const state = await getState();
       if (state && state[roomId]) {
+        // Check for Game Start
+        if (state[roomId].round_active && onGameStart) {
+          onGameStart();
+        }
+
         setChatHistory(state[roomId].chat_history || []);
         // Transformation for PlayerList if formats differ
         // Backend returns: [{name, score, is_host}, ...]
@@ -31,7 +36,7 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
       }
     }, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [roomId, onGameStart]);
 
   const handleSendMessage = (msg) => {
     sendChat(roomId, msg, playerName);

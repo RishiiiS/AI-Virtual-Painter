@@ -68,6 +68,7 @@ def get_state():
                 "round_active": room_data.get('round_active', False),
                 "drawer": room_data.get('drawer'),
                 "current_word": room_data.get('current_word'),
+                "time_remaining": int(room_data.get('time_remaining', 0)),
                 "player_count": len(players_list), # Unique count
                 "players": players_list,
                 "chat_history": room_data.get('chat_history', [])
