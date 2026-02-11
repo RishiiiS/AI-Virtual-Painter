@@ -14,6 +14,7 @@ function App() {
   const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join'
   const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState('room1'); // Default
+  const [isHost, setIsHost] = useState(false);
 
   if (view === 'lobby') {
     return (
@@ -23,7 +24,7 @@ function App() {
         <div className="shape shape-rect-br"></div>
         <div className="shape shape-circle-br"></div>
         <div className="shape shape-rect-bl"></div>
-        <Lobby playerName={nickname || "WebPlayer"} roomId={roomId} />
+        <Lobby playerName={nickname || "WebPlayer"} roomId={roomId} setRoomId={setRoomId} isHost={isHost} />
       </div>
     );
   }
@@ -74,6 +75,7 @@ function App() {
               <ActionButtons
                 onCreate={() => {
                   setRoomId('room1'); // For now static, later random
+                  setIsHost(true);
                   setView('lobby');
                 }}
                 onJoin={() => setView('join')}
@@ -83,6 +85,7 @@ function App() {
             <JoinRoom
               onJoin={(code) => {
                 setRoomId(code);
+                setIsHost(false);
                 setView('lobby');
               }}
               onBack={() => setView('landing')}

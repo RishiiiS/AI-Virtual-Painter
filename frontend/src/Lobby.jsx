@@ -6,7 +6,7 @@ import SettingsPanel from './components/SettingsPanel';
 import ChatPanel from './components/ChatPanel';
 import { getState, sendChat, startGame } from './api';
 
-const Lobby = ({ playerName = "WebPlayer", roomId = 'room1' }) => {
+const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost = false }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [players, setPlayers] = useState([]); // Need to update PlayerList to accept this
 
@@ -69,7 +69,7 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1' }) => {
 
         {/* Center: Settings */}
         <div style={{ minWidth: 0 }}>
-          <SettingsPanel onStartGame={handleStartGame} />
+          <SettingsPanel onStartGame={handleStartGame} isHost={isHost} roomId={roomId} setRoomId={setRoomId} />
         </div>
 
         {/* Right: Chat */}
