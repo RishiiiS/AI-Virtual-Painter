@@ -8,9 +8,12 @@ import ActionButtons from './components/ActionButtons'
 import Footer from './components/Footer'
 import Lobby from './Lobby'
 
+import JoinRoom from './components/JoinRoom'
+
 function App() {
-  const [view, setView] = useState('landing'); // 'landing' | 'lobby'
+  const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join'
   const [nickname, setNickname] = useState('');
+  const [roomId, setRoomId] = useState('room1'); // Default
 
   if (view === 'lobby') {
     return (
@@ -20,7 +23,7 @@ function App() {
         <div className="shape shape-rect-br"></div>
         <div className="shape shape-circle-br"></div>
         <div className="shape shape-rect-bl"></div>
-        <Lobby playerName={nickname || "WebPlayer"} />
+        <Lobby playerName={nickname || "WebPlayer"} roomId={roomId} />
       </div>
     );
   }
@@ -64,9 +67,28 @@ function App() {
             V.1
           </div>
 
-          <AvatarSelector />
-          <NicknameInput value={nickname} onChange={setNickname} />
-          <ActionButtons onPlay={() => setView('lobby')} />
+          {view === 'landing' ? (
+            <>
+              <AvatarSelector />
+              <NicknameInput value={nickname} onChange={setNickname} />
+              <ActionButtons
+                onCreate={() => {
+                  setRoomId('room1'); // For now static, later random
+                  setView('lobby');
+                }}
+                onJoin={() => setView('join')}
+              />
+            </>
+          ) : (
+            <JoinRoom
+              onJoin={(code) => {
+                setRoomId(code);
+                setView('lobby');
+              }}
+              onBack={() => setView('landing')}
+            />
+          )}
+
         </div>
 
         <Footer />

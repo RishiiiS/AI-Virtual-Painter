@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LobbyHeader = () => {
+const LobbyHeader = ({ roomId }) => {
     return (
         <div style={{
             display: 'flex',
@@ -47,10 +47,8 @@ const LobbyHeader = () => {
                     gap: '10px'
                 }}>
                     <span style={{ color: '#333' }}>ROOM:</span>
-                    <span style={{ color: '#D96C2C' }}>RETRO-99</span>
+                    <span style={{ color: '#D96C2C' }}>{roomId}</span>
                 </div>
-
-
             </div>
         </div>
     );

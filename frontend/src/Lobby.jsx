@@ -6,11 +6,9 @@ import SettingsPanel from './components/SettingsPanel';
 import ChatPanel from './components/ChatPanel';
 import { getState, sendChat, startGame } from './api';
 
-const Lobby = ({ playerName = "WebPlayer" }) => {
+const Lobby = ({ playerName = "WebPlayer", roomId = 'room1' }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [players, setPlayers] = useState([]); // Need to update PlayerList to accept this
-  // Hardcoded room for now
-  const roomId = 'room1';
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -54,7 +52,7 @@ const Lobby = ({ playerName = "WebPlayer" }) => {
       position: 'relative',
       zIndex: 10
     }}>
-      <LobbyHeader />
+      <LobbyHeader roomId={roomId} />
 
       <div style={{
         display: 'grid',
