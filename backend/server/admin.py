@@ -9,8 +9,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 from protocol import Protocol
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app) # Allow all origins for dev simplicity
 # Global reference to game_state, set by run_admin
 game_state_ref = None
 stroke_server_module = None # To access finish_round and handle_start_game
@@ -130,15 +132,14 @@ def perform_action():
 
     elif action == "send_chat":
         message = data.get('message')
+        sender = data.get('sender', 'ADMIN') # Default to ADMIN if not sent
         if not message:
             return jsonify({"error": "No message"}), 400
             
         # Broadcast via stroke_server's broadcast method
-        # We need to access the broadcast function. 
-        # Since stroke_server_module is imported, we can use it.
         chat_msg = json.dumps({
             Protocol.ACTION: Protocol.CHAT,
-            Protocol.PAYLOAD: f"ADMIN: {message}"
+            Protocol.PAYLOAD: f"[{sender}]: {message}" # Format: [Name]: Msg
         })
         stroke_server_module.broadcast(room_id, chat_msg)
         return jsonify({"status": "sent"})

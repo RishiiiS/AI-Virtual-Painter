@@ -1,6 +1,7 @@
+
 import React from 'react';
 
-const ActionButtons = () => {
+const ActionButtons = ({ onPlay }) => {
     return (
         <div style={{ display: 'flex', gap: '10px' }}>
             <button style={{
@@ -16,6 +17,7 @@ const ActionButtons = () => {
                 cursor: 'pointer',
                 transition: 'transform 0.1s',
             }}
+                onClick={onPlay}
                 onMouseDown={(e) => e.target.style.transform = 'translate(2px, 2px)'}
                 onMouseUp={(e) => e.target.style.transform = 'translate(0, 0)'}
             >

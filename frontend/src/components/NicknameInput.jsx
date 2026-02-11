@@ -1,15 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-const NicknameInput = () => {
-    const [name, setName] = useState('');
-
+const NicknameInput = ({ value, onChange }) => {
     return (
         <div style={{ marginBottom: '20px' }}>
             <input
                 type="text"
                 placeholder="ENTER YOUR NICKNAME"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
                 style={{
                     width: '100%',
                     padding: '15px',
