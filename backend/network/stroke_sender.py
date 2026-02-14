@@ -67,6 +67,16 @@ class StrokeSender:
                 # Drop frame - Network is too slow
                 pass
 
+    def send_ready(self, is_ready: bool):
+        """Send READY status update"""
+        packet = {
+            "action": "ready", # Protocol.READY string value
+            "room_id": self.room_id,
+            "player_name": self.player_name,
+            "payload": is_ready
+        }
+        self.send_data(packet)
+
     def _network_sender_loop(self):
         while self.running:
             try:

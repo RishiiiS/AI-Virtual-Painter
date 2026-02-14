@@ -13,6 +13,7 @@ class Protocol:
     ROUND_OVER = "round_over"
     CLEAR_CANVAS = "clear_canvas"
     VIDEO_FRAME = "video_frame"
+    READY = "ready"
     
     # Keys
     ACTION = "action"

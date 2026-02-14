@@ -208,6 +208,12 @@ def process_message(room_id, message, sender_conn):
                 broadcast(room_id, chat_msg, exclude_conn=None)
             return
 
+        if action == Protocol.READY:
+            is_ready = data.get(Protocol.PAYLOAD, False)
+            game_state.set_player_ready(room_id, sender_conn, is_ready)
+            # Optional: Broadcast chat message?
+            return
+
         # VIDEO FRAME (Stateless, High Frequency)
         if action == Protocol.VIDEO_FRAME:
              # Strict Enforcement: Video ONLY during active rounds
@@ -218,6 +224,12 @@ def process_message(room_id, message, sender_conn):
              if not game_state.is_drawer(room_id, sender_conn):
                  return
              
+             # Save to GameState for Web Client Polling
+             payload = data.get(Protocol.PAYLOAD)
+             if payload:
+                 game_state.update_video_frame(room_id, payload)
+                 # print(f"Video frame saved for {room_id}") # Debug
+
              # Broadcast immediately (No history)
              broadcast(room_id, message, exclude_conn=sender_conn)
              return
@@ -266,6 +278,19 @@ def handle_start_game(room_id, sender_conn=None):
 
     if game_state.is_round_active(room_id):
         print(f"Ignored start_game in {room_id} (already active)")
+        return
+
+    # Check Ready Status (only for manual start, not system/timer auto-start)
+    if sender_conn is not None and not game_state.are_all_players_ready(room_id):
+        print(f"Ignored start_game in {room_id} (not all players ready)")
+        fail_msg = json.dumps({
+            Protocol.ACTION: Protocol.CHAT,
+            Protocol.PAYLOAD: "SYSTEM: Cannot start! Not all players are ready."
+        })
+        try:
+            sender_conn.sendall((fail_msg + "\n").encode('utf-8'))
+        except:
+            pass
         return
         
     print(f"Starting game in {room_id}")

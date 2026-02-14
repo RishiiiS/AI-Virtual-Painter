@@ -27,10 +27,10 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
         const backendPlayers = state[roomId].players || [];
         const mappedPlayers = backendPlayers.map(p => ({
           name: p.name,
-          avatar: 'alien', // Placeholder
-          status: 'READY',
+          avatar: 'alien',
+          status: p.is_ready ? 'READY' : 'WAITING', // Map from backend
           isHost: p.is_host,
-          color: '#EBC334' // Placeholder
+          color: '#EBC334'
         }));
         setPlayers(mappedPlayers);
       }
@@ -74,7 +74,7 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
 
         {/* Center: Settings */}
         <div style={{ minWidth: 0 }}>
-          <SettingsPanel onStartGame={handleStartGame} isHost={isHost} roomId={roomId} setRoomId={setRoomId} />
+          <SettingsPanel onStartGame={handleStartGame} isHost={isHost} roomId={roomId} setRoomId={setRoomId} players={players} playerName={playerName} />
         </div>
 
         {/* Right: Chat */}

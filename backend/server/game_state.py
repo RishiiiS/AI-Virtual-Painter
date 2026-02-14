@@ -23,7 +23,8 @@ class GameState:
                     'drawer_queue': [], # List of names
                     'round_start_time': 0,
                     'round_duration': 60,
-                    'chat_history': [] 
+                    'chat_history': [],
+                    'latest_video_frame': None
                 }
                 print(f"Created new room: {room_id}")
 
@@ -122,10 +123,54 @@ class GameState:
             self.rooms[room_id]['players'][conn] = {
                 'name': player_name,
                 'score': 0,
-                'is_host': is_host
+                'is_host': is_host,
+                'is_ready': is_host # Host is implicitly ready (or doesn't matter)
             }
             
             print(f"Added player {player_name} to {room_id} (Host: {is_host})")
+
+    def set_player_ready(self, room_id, conn, is_ready):
+        """Set ready status for ALL connections with the same player name."""
+        with self.lock:
+            if room_id in self.rooms and 'players' in self.rooms[room_id]:
+                if conn in self.rooms[room_id]['players']:
+                    player_name = self.rooms[room_id]['players'][conn]['name']
+                    # Update ALL connections for this player name
+                    for c, p in self.rooms[room_id]['players'].items():
+                        if p['name'] == player_name:
+                            p['is_ready'] = is_ready
+                    print(f"Player {player_name} ready: {is_ready}")
+
+    def are_all_players_ready(self, room_id):
+        """Check readiness by unique player name, not per-connection."""
+        with self.lock:
+            if room_id not in self.rooms:
+                return False
+            
+            players = self.rooms[room_id].get('players', {})
+            
+            # Build unique player map: name -> {is_host, is_ready}
+            unique_players = {}
+            for p in players.values():
+                name = p['name']
+                if name not in unique_players:
+                    unique_players[name] = {'is_host': p['is_host'], 'is_ready': p.get('is_ready', False)}
+                else:
+                    # If ANY connection is host, player is host
+                    if p['is_host']:
+                        unique_players[name]['is_host'] = True
+                    # If ANY connection is ready, player is ready
+                    if p.get('is_ready', False):
+                        unique_players[name]['is_ready'] = True
+            
+            if len(unique_players) < 2:
+                return False
+            
+            for info in unique_players.values():
+                if not info['is_host'] and not info['is_ready']:
+                    return False
+            
+            return True
 
     def remove_client(self, room_id, conn):
         with self.lock:
@@ -152,6 +197,19 @@ class GameState:
                 # Cap history? 
                 if len(self.rooms[room_id]['chat_history']) > 100:
                     self.rooms[room_id]['chat_history'].pop(0)
+
+    def update_video_frame(self, room_id, frame_data):
+        # frame_data is base64 string
+        # No lock needed for simple assignment? safer with lock
+        with self.lock:
+            if room_id in self.rooms:
+                 self.rooms[room_id]['latest_video_frame'] = frame_data
+
+    def get_video_frame(self, room_id):
+        with self.lock:
+            if room_id in self.rooms:
+                return self.rooms[room_id].get('latest_video_frame')
+        return None
 
     def get_clients(self, room_id):
         with self.lock:

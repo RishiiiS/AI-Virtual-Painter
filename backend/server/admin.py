@@ -39,6 +39,7 @@ def get_state():
                         "name": name,
                         "score": p_data['score'],
                         "is_host": p_data['is_host'],
+                        "is_ready": p_data.get('is_ready', False),
                         "conns": []
                     }
                 # Track connections for kicking
@@ -53,6 +54,8 @@ def get_state():
                      players_dict[name]['score'] = p_data['score']
                 if p_data['is_host']:
                      players_dict[name]['is_host'] = True
+                if p_data.get('is_ready'):
+                     players_dict[name]['is_ready'] = True
 
             # Convert to list
             players_list = []
@@ -61,6 +64,7 @@ def get_state():
                     "name": p['name'],
                     "score": p['score'],
                     "is_host": p['is_host'],
+                    "is_ready": p['is_ready'],
                     "addr": ", ".join(p['conns']) # Show all addrs
                 })
             
@@ -76,6 +80,50 @@ def get_state():
             
     return jsonify(state_dump)
 
+@app.route('/api/video/<room_id>')
+def get_video(room_id):
+    if not game_state_ref:
+        return jsonify({"error": "Game state not linked"}), 500
+    
+    frame_data = game_state_ref.get_video_frame(room_id)
+    if not frame_data:
+        return jsonify({"error": "No video"}), 404
+        
+    return jsonify({"frame": frame_data})
+
+@app.route('/api/check_room/<room_id>')
+def check_room(room_id):
+    if not game_state_ref:
+        return jsonify({"error": "Game state not linked"}), 500
+    
+    exists = False
+    player_count = 0
+    round_active = False
+    all_ready = False
+    
+    with game_state_ref.lock:
+        if room_id in game_state_ref.rooms:
+            exists = True
+            room = game_state_ref.rooms[room_id]
+            player_count = len(room.get('players', {}))
+            round_active = room.get('round_active', False)
+            
+            # Check if all non-host players are ready
+            all_ready = True
+            for p in room.get('players', {}).values():
+                 if not p['is_host'] and not p.get('is_ready', False):
+                     all_ready = False
+                     break
+            if player_count < 2:
+                all_ready = False
+            
+    return jsonify({
+        "exists": exists, 
+        "player_count": player_count, 
+        "round_active": round_active,
+        "all_ready": all_ready
+    })
+
 @app.route('/api/action', methods=['POST'])
 def perform_action():
     data = request.json
@@ -88,10 +136,10 @@ def perform_action():
     print(f"ADMIN ACTION: {action} on {room_id}")
 
     if action == "start_game":
-        # Call handle_start_game in stroke_server
-        # We need a way to invoke it. 
-        # Since we run in a thread, we can call the module function directly if imported.
-        stroke_server_module.handle_start_game(room_id, None) # None = system/admin
+        # Validate readiness before starting (admin/HTTP path)
+        if not game_state_ref.are_all_players_ready(room_id):
+            return jsonify({"error": "Not all players are ready"}), 400
+        stroke_server_module.handle_start_game(room_id, None)
         return jsonify({"status": "started"})
         
     elif action == "end_round":
@@ -145,6 +193,27 @@ def perform_action():
         stroke_server_module.broadcast(room_id, chat_msg)
         return jsonify({"status": "sent"})
 
+    elif action == "ready_up":
+        sender = data.get('sender')
+        is_ready = data.get('is_ready', False)
+        
+        if not sender:
+            return jsonify({"error": "No sender"}), 400
+            
+        found = False
+        with game_state_ref.lock:
+            if room_id in game_state_ref.rooms:
+                room = game_state_ref.rooms[room_id]
+                for conn, p in room['players'].items():
+                    if p['name'] == sender:
+                        p['is_ready'] = is_ready
+                        found = True
+                        # Don't break — update ALL connections for this name
+        
+        if found:
+            return jsonify({"status": "updated"})
+        return jsonify({"error": "Player not found"}), 404
+
     return jsonify({"error": "Invalid action"}), 400
 
 def run_admin(game_state, stroke_server_mod):
@@ -158,3 +227,30 @@ def run_admin(game_state, stroke_server_mod):
     t = threading.Thread(target=app.run, kwargs=kwargs)
     t.daemon = True
     t.start()
+
+@app.route('/api/create_room', methods=['POST'])
+def create_room():
+    if not game_state_ref:
+        return jsonify({"error": "Game state not linked"}), 500
+        
+    import random
+    import string
+    
+    # Try to generate a unique room ID
+    new_room_id = ""
+    with game_state_ref.lock:
+        for _ in range(10): # Try 10 times
+            candidate = ''.join(random.choices(string.ascii_uppercase, k=4))
+            if candidate not in game_state_ref.rooms:
+                new_room_id = candidate
+                # We don't necessarily need to "create" it here if GameState creates on join,
+                # but reserving it prevents race conditions if we had a reservation system.
+                # Currently GameState creates on join. 
+                # But frontend needs an ID to join.
+                # So we just return a free ID.
+                break
+    
+    if new_room_id:
+        return jsonify({"room_id": new_room_id})
+    else:
+        return jsonify({"error": "Failed to generate unique room ID"}), 500

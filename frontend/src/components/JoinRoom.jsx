@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { checkRoom } from '../api';
 
 const JoinRoom = ({ onJoin, onBack }) => {
     const [roomCode, setRoomCode] = useState('');
@@ -68,7 +69,15 @@ const JoinRoom = ({ onJoin, onBack }) => {
                     cursor: 'pointer',
                     boxShadow: '4px 4px 0 #333'
                 }}
-                    onClick={() => roomCode && onJoin(roomCode)}
+                    onClick={async () => {
+                        if (!roomCode) return;
+                        const status = await checkRoom(roomCode);
+                        if (status.exists) {
+                            onJoin(roomCode);
+                        } else {
+                            alert("ROOM NOT FOUND!");
+                        }
+                    }}
                 >
                     JOIN ROOM
                 </button>

@@ -1,13 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { sendReady } from '../api';
 
-const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId }) => {
+const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], playerName }) => {
     const [duration, setDuration] = useState(60);
     const [settings, setSettings] = useState({
         quickChat: true,
         powerUps: true,
         difficulty: 1 // 0: Easy, 1: Medium, 2: Hard
     });
+    // Local ready state might drift from backend, rely on props?
+    // But we need immediate feedback.
+    // Let's use internal state but sync with props if needed.
+    // Actually, simple toggle with optimistic update is fine.
     const [isReady, setIsReady] = useState(false);
+
+    // Check if all players (except host? or all including host?) are ready.
+    // Backend logic: Host controls start. Others must be ready.
+    // We filter for non-hosts.
+    const guests = players.filter(p => !p.isHost);
+    const allGuestsReady = guests.length > 0 && guests.every(p => p.status === 'READY');
+
+    // Host can start if: at least 1 guest, and ALL guests are ready.
+    const canStart = isHost && guests.length >= 1 && allGuestsReady;
 
     const toggleSetting = (key) => {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -169,22 +183,33 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId }) => {
             <button style={{
                 width: '100%',
                 padding: '20px',
-                backgroundColor: isHost ? '#EBC334' : (isReady ? '#69B578' : '#ccc'),
+                backgroundColor: isHost ? (canStart ? '#EBC334' : '#ccc') : (isReady ? '#69B578' : '#ccc'),
                 border: '4px solid #333',
                 fontFamily: '"Titan One", sans-serif',
                 fontSize: '2.5rem',
                 textTransform: 'uppercase',
                 boxShadow: '6px 6px 0 #333',
-                cursor: 'pointer',
+                cursor: (isHost && !canStart) ? 'not-allowed' : 'pointer',
                 marginBottom: '20px',
                 zIndex: 1,
-                color: '#333'
+                color: '#333',
+                opacity: (isHost && !canStart) ? 0.6 : 1
             }}
                 onClick={() => {
                     if (isHost) {
-                        onStartGame();
+                        if (canStart) {
+                            onStartGame();
+                        } else {
+                            if (guests.length === 0) {
+                                alert("Need at least 2 players!");
+                            } else {
+                                alert("Wait for all players to be READY!");
+                            }
+                        }
                     } else {
-                        setIsReady(!isReady);
+                        const newState = !isReady;
+                        setIsReady(newState);
+                        sendReady(roomId, newState, playerName);
                     }
                 }}
             >
@@ -192,7 +217,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId }) => {
             </button>
 
             <div style={{ textAlign: 'center', fontFamily: '"Fredoka", sans-serif', color: '#666', fontSize: '0.8rem', letterSpacing: '2px', fontWeight: 'bold' }}>
-                WAITING FOR OTHERS TO BE READY...
+                {isHost ? (guests.length === 0 ? "WAITING FOR PLAYERS..." : (canStart ? "READY TO START!" : "WAITING FOR OTHERS TO BE READY...")) : "ARE YOU READY?"}
             </div>
 
         </div>

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 
-const DrawingCanvas = ({ isDrawer }) => {
+const DrawingCanvas = ({ isDrawer, videoFrame }) => {
     const canvasRef = useRef(null);
 
     useEffect(() => {
@@ -37,6 +37,46 @@ const DrawingCanvas = ({ isDrawer }) => {
                     cursor: isDrawer ? 'crosshair' : 'default'
                 }}
             />
+
+            {/* Drawer Video Feed (PIP) - Inside Canvas Container */}
+            {videoFrame && (
+                <div style={{
+                    position: 'absolute',
+                    top: '0',
+                    left: '0',
+                    width: '200px',
+                    borderRight: '3px solid #333',
+                    borderBottom: '3px solid #333',
+                    borderTop: 'none',
+                    borderLeft: 'none',
+                    backgroundColor: '#000',
+                    zIndex: 20,
+                    pointerEvents: 'none' // Let clicks pass through to canvas? Probably not for video area but ok.
+                }}>
+                    <img
+                        src={`data:image/jpeg;base64,${videoFrame}`}
+                        alt="Drawer Feed"
+                        style={{
+                            width: '100%',
+                            display: 'block'
+                        }}
+                    />
+                    <div style={{
+                        position: 'absolute',
+                        bottom: '0',
+                        left: '0',
+                        right: '0',
+                        backgroundColor: 'rgba(0,0,0,0.6)',
+                        color: 'white',
+                        fontSize: '0.8rem',
+                        padding: '4px',
+                        textAlign: 'center',
+                        fontFamily: '"Fredoka", sans-serif'
+                    }}>
+                        Live Feed
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

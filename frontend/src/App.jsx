@@ -9,6 +9,7 @@ import Footer from './components/Footer'
 import Game from './Game'
 import Lobby from './Lobby'
 import JoinRoom from './components/JoinRoom'
+import { checkRoom, createRoom } from './api';
 
 function App() {
   const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join' | 'game'
@@ -96,10 +97,15 @@ function App() {
               <AvatarSelector />
               <NicknameInput value={nickname} onChange={setNickname} />
               <ActionButtons
-                onCreate={() => {
-                  setRoomId('room1'); // For now static, later random
-                  setIsHost(true);
-                  setView('lobby');
+                onCreate={async () => {
+                  const res = await createRoom();
+                  if (res.room_id) {
+                    setRoomId(res.room_id);
+                    setIsHost(true);
+                    setView('lobby');
+                  } else {
+                    alert("Failed to create room: " + (res.error || "Unknown error"));
+                  }
                 }}
                 onJoin={() => setView('join')}
               />

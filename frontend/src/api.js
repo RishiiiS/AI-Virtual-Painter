@@ -47,3 +47,53 @@ export const startGame = async (roomId) => {
         console.error("Start game error:", e);
     }
 };
+
+export const getVideoFrame = async (roomId) => {
+    try {
+        const res = await fetch(`${API_URL}/video/${roomId}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return data.frame; // base64 string
+    } catch (e) {
+        return null;
+    }
+};
+
+export const checkRoom = async (roomId) => {
+    try {
+        const res = await fetch(`${API_URL}/check_room/${roomId}`);
+        if (!res.ok) return { exists: false, error: 'Network error' };
+        return await res.json();
+    } catch (e) {
+        return { exists: false, error: e.message };
+    }
+};
+
+export const sendReady = async (roomId, isReady, playerName) => {
+    try {
+        await fetch(`${API_URL}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'ready_up',
+                room_id: roomId,
+                is_ready: isReady,
+                sender: playerName
+            })
+        });
+    } catch (e) {
+        console.error("Send ready error:", e);
+    }
+};
+
+export const createRoom = async () => {
+    try {
+        const res = await fetch(`${API_URL}/create_room`, {
+            method: 'POST'
+        });
+        if (!res.ok) throw new Error("Failed to create room");
+        return await res.json();
+    } catch (e) {
+        return { error: e.message };
+    }
+};

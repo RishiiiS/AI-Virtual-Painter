@@ -5,7 +5,7 @@ import DrawingCanvas from './components/DrawingCanvas';
 import Palette from './components/Palette';
 import GameChat from './components/GameChat';
 import PlayerList from './components/PlayerList'; // Reuse PlayerList
-import { getState, sendChat } from './api';
+import { getState, sendChat, getVideoFrame } from './api';
 
 const Game = ({ playerName, roomId, onEndGame }) => {
     const [gameState, setGameState] = useState(null);
@@ -13,6 +13,7 @@ const Game = ({ playerName, roomId, onEndGame }) => {
     const [selectedColor, setSelectedColor] = useState('#333333');
     const [brushSize, setBrushSize] = useState(5); // Default size
     const [isDrawer, setIsDrawer] = useState(false);
+    const [videoFrame, setVideoFrame] = useState(null);
 
     useEffect(() => {
         const interval = setInterval(async () => {
@@ -23,7 +24,16 @@ const Game = ({ playerName, roomId, onEndGame }) => {
 
                 // Check if current user is drawer
                 // Note: roomData.drawer is the name of the drawer
-                setIsDrawer(roomData.drawer === playerName);
+                const currentlyDrawer = roomData.drawer === playerName;
+                setIsDrawer(currentlyDrawer);
+
+                // Poll Video if NOT drawer and round active
+                if (!currentlyDrawer && roomData.round_active) {
+                    const frame = await getVideoFrame(roomId);
+                    if (frame) setVideoFrame(frame);
+                } else {
+                    setVideoFrame(null);
+                }
 
                 // Check if round ended (optional: could auto-redirect or show game over screen)
                 if (!roomData.round_active) {
@@ -113,6 +123,7 @@ const Game = ({ playerName, roomId, onEndGame }) => {
                         color={selectedColor}
                         tool={selectedTool}
                         brushSize={brushSize}
+                        videoFrame={videoFrame}
                     />
 
                     {/* Palette (Only if Drawer) */}

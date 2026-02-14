@@ -110,13 +110,36 @@ detector = htm.handDetect(min_dect_confidence = 0.85)
 strokeManager = StrokeManager()
 
 # Ask for Room ID
+import urllib.request
+import urllib.error
+
 try:
-    room_id = input("Enter Room ID (default: room1): ").strip()
-    if not room_id:
-        room_id = "room1"
     player_name = input("Enter Player Name (default: Guest): ").strip()
     if not player_name:
         player_name = "Guest"
+    
+    print("\n[C] Create Room  |  [J] Join Room")
+    choice = input("Choice (c/j): ").strip().lower()
+    
+    if choice == 'c':
+        # Create room via API (same as frontend)
+        try:
+            req = urllib.request.Request("http://localhost:5001/api/create_room", method='POST')
+            with urllib.request.urlopen(req) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            if 'room_id' in data:
+                room_id = data['room_id']
+                print(f"Room created: {room_id}")
+            else:
+                print(f"Error: {data.get('error', 'Unknown')}")
+                room_id = "room1"
+        except Exception as e:
+            print(f"API Error (is server running?): {e}")
+            room_id = input("Enter Room ID manually: ").strip() or "room1"
+    else:
+        room_id = input("Enter Room Code: ").strip().upper()
+        if not room_id:
+            room_id = "room1"
 except:
     room_id = "room1"
     player_name = "Guest"
@@ -130,8 +153,9 @@ print(f"       JOINED ROOM: {room_id}")
 print(f"       PLAYER: {player_name}")
 print("="*40)
 print("INSTRUCTIONS:")
-print("1. To START GAME: Press 's' on the CAMERA WINDOW (not here).")
-print("2. To CHAT/GUESS: Type here in the terminal.")
+print("1. To READY UP: Press 'r'.")
+print("2. To START GAME: Press 's' (Host only).")
+print("3. To CHAT/GUESS: Type here in the terminal.")
 print("="*40 + "\n")
 
 
@@ -175,6 +199,7 @@ def drawLocally(stroke,img,image_canvas):
 DRAW_MODE = "gesture" # "gesture" or "mouse"
 mouse_drawing = False
 mouse_x, mouse_y = 0, 0
+is_ready = False # Track readiness
 mouse_x, mouse_y = 0, 0
 
 def draw_mouse(event, x, y, flags, param):
@@ -410,13 +435,13 @@ while True:
              pip_img = np.zeros((pip_h, pip_w, 3), dtype=np.uint8)
              cv2.putText(pip_img, "NO VIDEO", (100, 100), cv2.FONT_HERSHEY_PLAIN, 1, (255, 255, 255), 1)
     
-    # Position: Top Right (below header)
+    # Position: Top Left (below header)
     # Header is 100px.
     # Video box size: 320x180
-    pip_x1 = 1280 - pip_w - 10
-    pip_y1 = HEADER_HEIGHT + 10
-    pip_x2 = 1280 - 10
-    pip_y2 = HEADER_HEIGHT + 10 + pip_h
+    pip_x1 = 0
+    pip_y1 = HEADER_HEIGHT
+    pip_x2 = pip_x1 + pip_w
+    pip_y2 = HEADER_HEIGHT + pip_h
     
     img_display[pip_y1:pip_y2, pip_x1:pip_x2] = pip_img
     
@@ -458,6 +483,12 @@ while True:
     mode_color = (0, 255, 0) if DRAW_MODE == "gesture" else (0, 0, 255)
     cv2.putText(img_display, f"Mode: {DRAW_MODE.upper()}", (10, 210), cv2.FONT_HERSHEY_PLAIN, 1.5, mode_color, 2)
     cv2.putText(img_display, "('m': Mouse, 'g': Gesture)", (10, 230), cv2.FONT_HERSHEY_PLAIN, 1, (100, 100, 100), 1)
+
+    # Ready Status
+    status_text = "READY" if is_ready else "NOT READY"
+    status_color = (0, 255, 0) if is_ready else (0, 0, 255)
+    cv2.putText(img_display, f"Status: {status_text}", (10, 260), cv2.FONT_HERSHEY_PLAIN, 1.5, status_color, 2)
+    cv2.putText(img_display, "('r': Toggle Ready)", (10, 280), cv2.FONT_HERSHEY_PLAIN, 1, (100, 100, 100), 1)
 
     # Timer Display
     if strokeReceiver.round_end_time:
@@ -503,6 +534,16 @@ while True:
                 strokeSender.send_data(msg)
             except Exception as e:
                 print(f"Failed to start game: {e}")
+            # Also auto-ready host?
+            # Host is implicitly ready by starting, but maybe explicit helps?
+            # Let's keep it manual or auto. Host pressing Start implies ready.
+
+    elif key & 0xFF == ord('r'):
+        # Toggle Ready
+        is_ready = not is_ready
+        print(f"Toggled Ready: {is_ready}")
+        if strokeSender:
+            strokeSender.send_ready(is_ready)
 
 if not webcam_stream.stopped:
     webcam_stream.stop()
