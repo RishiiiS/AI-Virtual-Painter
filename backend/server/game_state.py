@@ -182,6 +182,49 @@ class GameState:
                     
                 # If host left, assign new host? For now, keep it simple.
 
+    def add_web_client(self, room_id, player_name):
+        """Register a web player using a string key (no TCP socket)."""
+        self.create_room_if_missing(room_id)
+        with self.lock:
+            if 'players' not in self.rooms[room_id]:
+                self.rooms[room_id]['players'] = {}
+            
+            web_key = f"web_{player_name}"
+            
+            # Check if already registered
+            if web_key in self.rooms[room_id]['players']:
+                return web_key  # Already registered
+            
+            # Determine if host (first player is host)
+            is_host = len(self.rooms[room_id]['players']) == 0
+            
+            self.rooms[room_id]['players'][web_key] = {
+                'name': player_name,
+                'score': 0,
+                'is_host': is_host,
+                'is_ready': is_host
+            }
+            
+            print(f"Added web player {player_name} to {room_id} (Host: {is_host})")
+            return web_key
+
+    def is_web_drawer(self, room_id, player_name):
+        """Check if a web player (by name) is the current drawer."""
+        with self.lock:
+            if room_id in self.rooms:
+                room = self.rooms[room_id]
+                if not room.get('round_active', False):
+                    return True  # Allow drawing in lobby
+                return room.get('drawer') == player_name
+        return False
+
+    def get_player_name_by_key(self, room_id, key):
+        """Get player name from any key (socket or string)."""
+        with self.lock:
+            if room_id in self.rooms and 'players' in self.rooms[room_id]:
+                if key in self.rooms[room_id]['players']:
+                    return self.rooms[room_id]['players'][key]['name']
+        return None
 
     def add_stroke(self, room_id, stroke_data):
         with self.lock:

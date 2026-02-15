@@ -28,6 +28,7 @@ function App() {
         <Game
           playerName={nickname || "WebPlayer"}
           roomId={roomId}
+          isHost={isHost}
           onEndGame={() => setView('landing')}
         />
       </div>

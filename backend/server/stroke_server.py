@@ -296,6 +296,11 @@ def handle_start_game(room_id, sender_conn=None):
     print(f"Starting game in {room_id}")
     game_state.set_round_active(room_id, True)
     
+    # Clear stroke history for the new round
+    with game_state.lock:
+        if room_id in game_state.rooms:
+            game_state.rooms[room_id]['history'] = []
+    
     # 1. Select Drawer
     drawer_name = game_state.select_drawer(room_id)
     print(f"Drawer selected for {room_id}: {drawer_name}")

@@ -97,3 +97,51 @@ export const createRoom = async () => {
         return { error: e.message };
     }
 };
+
+export const joinRoom = async (roomId, playerName) => {
+    try {
+        const res = await fetch(`${API_URL}/join_room`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId, player_name: playerName })
+        });
+        return await res.json();
+    } catch (e) {
+        console.error("Join room error:", e);
+        return { error: e.message };
+    }
+};
+
+export const sendStroke = async (roomId, playerName, stroke) => {
+    try {
+        await fetch(`${API_URL}/send_stroke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId, player_name: playerName, stroke })
+        });
+    } catch (e) {
+        // Silent fail for high-frequency calls
+    }
+};
+
+export const getStrokes = async (roomId, since = 0) => {
+    try {
+        const res = await fetch(`${API_URL}/strokes/${roomId}?since=${since}`);
+        if (!res.ok) return { strokes: [], total: since };
+        return await res.json();
+    } catch (e) {
+        return { strokes: [], total: since };
+    }
+};
+
+export const clearCanvas = async (roomId) => {
+    try {
+        await fetch(`${API_URL}/clear_canvas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId })
+        });
+    } catch (e) {
+        console.error("Clear canvas error:", e);
+    }
+};

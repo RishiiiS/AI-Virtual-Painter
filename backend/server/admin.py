@@ -254,3 +254,100 @@ def create_room():
         return jsonify({"room_id": new_room_id})
     else:
         return jsonify({"error": "Failed to generate unique room ID"}), 500
+
+@app.route('/api/join_room', methods=['POST'])
+def join_room():
+    """Register a web player in the game state (no TCP socket needed)."""
+    if not game_state_ref:
+        return jsonify({"error": "Game state not linked"}), 500
+    
+    data = request.json
+    room_id = data.get('room_id')
+    player_name = data.get('player_name', 'WebPlayer')
+    
+    if not room_id:
+        return jsonify({"error": "No room_id"}), 400
+    
+    web_key = game_state_ref.add_web_client(room_id, player_name)
+    
+    # Check if this player is host
+    is_host = False
+    with game_state_ref.lock:
+        if room_id in game_state_ref.rooms:
+            p = game_state_ref.rooms[room_id]['players'].get(web_key)
+            if p:
+                is_host = p['is_host']
+    
+    return jsonify({"status": "joined", "web_key": web_key, "is_host": is_host})
+
+@app.route('/api/send_stroke', methods=['POST'])
+def send_stroke():
+    """Accept a stroke from a web drawer and broadcast to TCP clients."""
+    if not game_state_ref or not stroke_server_module:
+        return jsonify({"error": "Server not linked"}), 500
+    
+    data = request.json
+    room_id = data.get('room_id')
+    player_name = data.get('player_name')
+    stroke = data.get('stroke')  # The stroke data dict
+    
+    if not room_id or not stroke:
+        return jsonify({"error": "Missing room_id or stroke"}), 400
+    
+    # Validate drawer
+    if not game_state_ref.is_web_drawer(room_id, player_name):
+        return jsonify({"error": "Not the drawer"}), 403
+    
+    # Serialize and store
+    stroke_json = json.dumps(stroke)
+    game_state_ref.add_stroke(room_id, stroke_json)
+    
+    # Broadcast to TCP clients (no exclude since web client isn't a TCP conn)
+    stroke_server_module.broadcast(room_id, stroke_json)
+    
+    return jsonify({"status": "ok"})
+
+@app.route('/api/strokes/<room_id>')
+def get_strokes(room_id):
+    """Return stroke history, with optional incremental polling via ?since=N."""
+    if not game_state_ref:
+        return jsonify({"error": "Game state not linked"}), 500
+    
+    since = request.args.get('since', 0, type=int)
+    history = game_state_ref.get_history(room_id)
+    
+    # Return strokes from index 'since' onwards
+    new_strokes = history[since:]
+    
+    # Parse JSON strings back to objects for the frontend
+    parsed = []
+    for s in new_strokes:
+        try:
+            parsed.append(json.loads(s))
+        except:
+            pass
+    
+    return jsonify({"strokes": parsed, "total": len(history)})
+
+@app.route('/api/clear_canvas', methods=['POST'])
+def clear_canvas():
+    """Clear stroke history and broadcast clear to TCP clients."""
+    if not game_state_ref or not stroke_server_module:
+        return jsonify({"error": "Server not linked"}), 500
+    
+    data = request.json
+    room_id = data.get('room_id')
+    
+    if not room_id:
+        return jsonify({"error": "Missing room_id"}), 400
+    
+    # Clear history
+    with game_state_ref.lock:
+        if room_id in game_state_ref.rooms:
+            game_state_ref.rooms[room_id]['history'] = []
+    
+    # Broadcast clear command to TCP clients
+    clear_msg = json.dumps({"action": "clear"})
+    stroke_server_module.broadcast(room_id, clear_msg)
+    
+    return jsonify({"status": "cleared"})

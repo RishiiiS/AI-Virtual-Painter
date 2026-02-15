@@ -1,14 +1,25 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import LobbyHeader from './components/LobbyHeader';
 import PlayerList from './components/PlayerList';
 import SettingsPanel from './components/SettingsPanel';
 import ChatPanel from './components/ChatPanel';
-import { getState, sendChat, startGame } from './api';
+import { getState, sendChat, startGame, joinRoom } from './api';
 
 const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost = false, onGameStart }) => {
   const [chatHistory, setChatHistory] = useState([]);
-  const [players, setPlayers] = useState([]); // Need to update PlayerList to accept this
+  const [players, setPlayers] = useState([]);
+  const joinedRef = useRef(false);
+
+  // Register web player on mount
+  useEffect(() => {
+    if (!joinedRef.current) {
+      joinedRef.current = true;
+      joinRoom(roomId, playerName).then(res => {
+        console.log("Lobby: Joined room", res);
+      });
+    }
+  }, [roomId, playerName]);
 
   useEffect(() => {
     const interval = setInterval(async () => {
@@ -20,15 +31,11 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
         }
 
         setChatHistory(state[roomId].chat_history || []);
-        // Transformation for PlayerList if formats differ
-        // Backend returns: [{name, score, is_host}, ...]
-        // PlayerList expects: [{name, avatar, status, isHost, color}]
-        // We'll map it roughly.
         const backendPlayers = state[roomId].players || [];
         const mappedPlayers = backendPlayers.map(p => ({
           name: p.name,
           avatar: 'alien',
-          status: p.is_ready ? 'READY' : 'WAITING', // Map from backend
+          status: p.is_ready ? 'READY' : 'WAITING',
           isHost: p.is_host,
           color: '#EBC334'
         }));
