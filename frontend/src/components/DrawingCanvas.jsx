@@ -1,9 +1,24 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 
-const DrawingCanvas = ({ isDrawer, color, tool, brushSize, videoFrame, roomId, playerName, onSendStroke, strokesFromServer }) => {
+const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId, playerName, onSendStroke, strokesFromServer }) => {
     const canvasRef = useRef(null);
+    const videoRef = useRef(null);
     const isDrawing = useRef(false);
     const lastPoint = useRef(null);
+
+    // Set video srcObject when remoteStream changes
+    useEffect(() => {
+        const video = videoRef.current;
+        if (video && remoteStream) {
+            video.srcObject = remoteStream;
+            // Explicit play() — autoPlay can be unreliable
+            video.play().catch(err => {
+                console.warn('[Video] Autoplay blocked, retrying:', err.message);
+                // Retry after a short delay
+                setTimeout(() => video.play().catch(() => { }), 500);
+            });
+        }
+    }, [remoteStream]);
 
     // Initialize canvas with white background
     useEffect(() => {
@@ -151,8 +166,8 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, videoFrame, roomId, p
                 onClick={handleClick}
             />
 
-            {/* Drawer Video Feed (PIP) - Inside Canvas Container */}
-            {videoFrame && (
+            {/* Drawer Video Feed (PIP) — WebRTC stream */}
+            {remoteStream && !isDrawer && (
                 <div style={{
                     position: 'absolute',
                     top: '0',
@@ -166,12 +181,15 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, videoFrame, roomId, p
                     zIndex: 20,
                     pointerEvents: 'none'
                 }}>
-                    <img
-                        src={`data:image/jpeg;base64,${videoFrame}`}
-                        alt="Drawer Feed"
+                    <video
+                        ref={videoRef}
+                        autoPlay
+                        playsInline
+                        muted
                         style={{
                             width: '100%',
-                            display: 'block'
+                            display: 'block',
+                            transform: 'scaleX(-1)'
                         }}
                     />
                     <div style={{
@@ -186,7 +204,7 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, videoFrame, roomId, p
                         textAlign: 'center',
                         fontFamily: '"Fredoka", sans-serif'
                     }}>
-                        Live Feed
+                        🟢 Live Feed
                     </div>
                 </div>
             )}

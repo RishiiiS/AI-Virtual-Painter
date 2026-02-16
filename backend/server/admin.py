@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify, request
+from flask_socketio import SocketIO, emit, join_room as sio_join_room, leave_room as sio_leave_room
 import threading
 import json
 import os
@@ -13,9 +14,14 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app) # Allow all origins for dev simplicity
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 # Global reference to game_state, set by run_admin
 game_state_ref = None
 stroke_server_module = None # To access finish_round and handle_start_game
+
+# Track drawer Socket.IO SID per room
+_drawer_sids = {}  # { room_id: sid }
 
 @app.route('/')
 def index():
@@ -216,15 +222,102 @@ def perform_action():
 
     return jsonify({"error": "Invalid action"}), 400
 
+# ─── Socket.IO Signaling Events ───
+
+_guesser_sids = {}  # room_id → set of guesser SIDs
+
+@socketio.on('connect')
+def handle_sio_connect():
+    print(f"[Socket.IO] Client connected: {request.sid}")
+
+@socketio.on('disconnect')
+def handle_sio_disconnect(reason=None):
+    sid = request.sid
+    # Clean up drawer SID if this was a drawer
+    for room_id, dsid in list(_drawer_sids.items()):
+        if dsid == sid:
+            del _drawer_sids[room_id]
+            print(f"[Socket.IO] Drawer disconnected from {room_id}")
+    # Clean up guesser SID
+    for room_id, sids in list(_guesser_sids.items()):
+        sids.discard(sid)
+    print(f"[Socket.IO] Client disconnected: {sid}")
+
+@socketio.on('join_room')
+def handle_sio_join_room(data):
+    room_id = data.get('room_id')
+    role = data.get('role', 'guesser')  # 'drawer' or 'guesser'
+    if room_id:
+        sio_join_room(room_id)
+        if role == 'drawer':
+            # Clean up: this SID may have been a guesser before role change
+            if room_id in _guesser_sids:
+                _guesser_sids[room_id].discard(request.sid)
+            _drawer_sids[room_id] = request.sid
+            print(f"[Socket.IO] Drawer joined room {room_id} (sid={request.sid})")
+            # Notify drawer of ALL existing guessers already in the room
+            existing_guessers = _guesser_sids.get(room_id, set())
+            for gsid in existing_guessers:
+                emit('new_guesser', {'guesser_sid': gsid}, to=request.sid)
+                print(f"[Socket.IO] Notified new drawer of existing guesser {gsid}")
+        else:
+            # Clean up: this SID may have been a drawer before role change
+            if _drawer_sids.get(room_id) == request.sid:
+                del _drawer_sids[room_id]
+            # Track this guesser
+            if room_id not in _guesser_sids:
+                _guesser_sids[room_id] = set()
+            _guesser_sids[room_id].add(request.sid)
+            # Notify drawer that a new guesser joined
+            drawer_sid = _drawer_sids.get(room_id)
+            if drawer_sid:
+                emit('new_guesser', {'guesser_sid': request.sid}, to=drawer_sid)
+                print(f"[Socket.IO] Notified drawer of new guesser {request.sid} in {room_id}")
+            else:
+                print(f"[Socket.IO] Guesser joined room {room_id} but no drawer yet (sid={request.sid})")
+
+@socketio.on('webrtc_offer')
+def handle_webrtc_offer(data):
+    """Drawer sends offer targeted to a specific guesser."""
+    room_id = data.get('room_id')
+    offer = data.get('offer')
+    target_sid = data.get('target_sid')  # Specific guesser SID
+    if room_id and offer and target_sid:
+        emit('webrtc_offer', {'offer': offer, 'from': request.sid}, to=target_sid)
+        print(f"[WebRTC] Offer sent to guesser {target_sid} in {room_id}")
+
+@socketio.on('webrtc_answer')
+def handle_webrtc_answer(data):
+    """Guesser sends answer → relay to drawer."""
+    room_id = data.get('room_id')
+    answer = data.get('answer')
+    drawer_sid = _drawer_sids.get(room_id)
+    if room_id and answer and drawer_sid:
+        emit('webrtc_answer', {'answer': answer, 'from': request.sid}, to=drawer_sid)
+        print(f"[WebRTC] Answer relayed to drawer in {room_id}")
+
+@socketio.on('webrtc_ice_candidate')
+def handle_webrtc_ice(data):
+    """Relay ICE candidates between drawer and a specific guesser."""
+    room_id = data.get('room_id')
+    candidate = data.get('candidate')
+    target_sid = data.get('target_sid')  # Specific target SID
+    
+    if not room_id or not candidate or not target_sid:
+        return
+    
+    emit('webrtc_ice_candidate', {'candidate': candidate, 'from': request.sid}, to=target_sid)
+
+# ─── Server Startup ───
+
 def run_admin(game_state, stroke_server_mod):
     global game_state_ref, stroke_server_module
     game_state_ref = game_state
     stroke_server_module = stroke_server_mod
     
-    # Run Flask in a separate thread
-    # Disable reloader to prevent main thread issues
-    kwargs = {'host': '0.0.0.0', 'port': 5001, 'debug': False, 'use_reloader': False}
-    t = threading.Thread(target=app.run, kwargs=kwargs)
+    # Run Flask-SocketIO in a separate thread
+    kwargs = {'host': '0.0.0.0', 'port': 5001, 'debug': False, 'use_reloader': False, 'allow_unsafe_werkzeug': True}
+    t = threading.Thread(target=socketio.run, args=(app,), kwargs=kwargs)
     t.daemon = True
     t.start()
 
