@@ -74,12 +74,21 @@ def get_state():
                     "addr": ", ".join(p['conns']) # Show all addrs
                 })
             
+            # Compute time remaining dynamically
+            time_remaining = 0
+            if room_data.get('round_active'):
+                import time as _time
+                start = room_data.get('round_start_time', 0)
+                duration = room_data.get('round_duration', 60)
+                elapsed = _time.time() - start
+                time_remaining = max(0, int(duration - elapsed))
+
             state_dump[room_id] = {
                 "round_active": room_data.get('round_active', False),
                 "drawer": room_data.get('drawer'),
                 "current_word": room_data.get('current_word'),
-                "time_remaining": int(room_data.get('time_remaining', 0)),
-                "player_count": len(players_list), # Unique count
+                "time_remaining": time_remaining,
+                "player_count": len(players_list),
                 "players": players_list,
                 "chat_history": room_data.get('chat_history', [])
             }
@@ -145,8 +154,11 @@ def perform_action():
         # Validate readiness before starting (admin/HTTP path)
         if not game_state_ref.are_all_players_ready(room_id):
             return jsonify({"error": "Not all players are ready"}), 400
-        stroke_server_module.handle_start_game(room_id, None)
-        return jsonify({"status": "started"})
+        duration = data.get('duration', 60)
+        # Clamp to valid range (30s - 180s)
+        duration = max(30, min(180, int(duration)))
+        stroke_server_module.handle_start_game(room_id, None, duration=duration)
+        return jsonify({"status": "started", "duration": duration})
         
     elif action == "end_round":
         # Call finish_round

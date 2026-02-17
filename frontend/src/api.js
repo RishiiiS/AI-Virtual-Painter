@@ -30,15 +30,16 @@ export const sendChat = async (roomId, message, sender) => {
     }
 };
 
-export const startGame = async (roomId) => {
-    console.log("Found roomId for start:", roomId);
+export const startGame = async (roomId, duration = 60) => {
+    console.log("Found roomId for start:", roomId, "duration:", duration);
     try {
         const res = await fetch(`${API_URL}/action`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 action: 'start_game',
-                room_id: roomId
+                room_id: roomId,
+                duration: duration
             })
         });
         const json = await res.json();

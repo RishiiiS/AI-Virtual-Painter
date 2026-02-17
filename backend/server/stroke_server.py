@@ -154,9 +154,13 @@ def finish_round(room_id):
     })
     broadcast(room_id, round_over_msg)
     
-    # 5. Auto-Start Next Round in 5 seconds
-    print(f"Scheduling next round for {room_id} in 5s...")
-    t = threading.Timer(5.0, handle_start_game, args=[room_id, None]) 
+    # 5. Auto-Start Next Round in 1 second (preserve room duration)
+    room_duration = 60
+    with game_state.lock:
+        if room_id in game_state.rooms:
+            room_duration = game_state.rooms[room_id].get('room_duration', 60)
+    print(f"Scheduling next round for {room_id} in 1s (duration={room_duration}s)...")
+    t = threading.Timer(1.0, handle_start_game, args=[room_id, None], kwargs={'duration': room_duration}) 
     t.start()
 
 def handle_time_expiry(room_id):
@@ -270,7 +274,7 @@ def broadcast(room_id, message, exclude_conn=None):
             except Exception as e:
                 print(f"Broadcast error: {e}")
 
-def handle_start_game(room_id, sender_conn=None):
+def handle_start_game(room_id, sender_conn=None, duration=60):
     # Validation: Sender must be host OR system (None)
     if sender_conn and not game_state.is_host(room_id, sender_conn):
         print(f"Ignored start_game from non-host in {room_id}")
@@ -293,7 +297,7 @@ def handle_start_game(room_id, sender_conn=None):
             pass
         return
         
-    print(f"Starting game in {room_id}")
+    print(f"Starting game in {room_id} with duration={duration}s")
     game_state.set_round_active(room_id, True)
     
     # Clear stroke history for the new round
@@ -310,13 +314,16 @@ def handle_start_game(room_id, sender_conn=None):
     game_state.set_word(room_id, word)
     print(f"Word selected for {room_id}: {word}")
     
-    # 3. Start Timer (60s)
-    game_state.start_timer(room_id, 60.0, handle_time_expiry)
+    # 3. Store and start timer with chosen duration
+    with game_state.lock:
+        if room_id in game_state.rooms:
+            game_state.rooms[room_id]['room_duration'] = duration
+    game_state.start_timer(room_id, float(duration), handle_time_expiry)
 
     # 4. Broadcast GAME_START
     start_msg = json.dumps({
         Protocol.ACTION: Protocol.GAME_START,
-        Protocol.PAYLOAD: 60
+        Protocol.PAYLOAD: duration
     })
     
     # 5. Broadcast DRAWER_ASSIGN

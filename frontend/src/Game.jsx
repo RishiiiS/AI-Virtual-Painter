@@ -16,6 +16,7 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
     const [selectedColor, setSelectedColor] = useState('#333333');
     const [brushSize, setBrushSize] = useState(5);
     const [isDrawer, setIsDrawer] = useState(false);
+    const [drawMode, setDrawMode] = useState('mouse'); // 'mouse' or 'gesture'
     const [remoteStream, setRemoteStream] = useState(null);
     const [newStrokes, setNewStrokes] = useState([]);
     const strokeIndexRef = useRef(0);
@@ -281,6 +282,23 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
         sendStroke(roomId, playerName, stroke);
     }, [roomId, playerName]);
 
+    // Keyboard shortcut: G=gesture, M=mouse
+    useEffect(() => {
+        const handleKey = (e) => {
+            if (!isDrawer) return;
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            if (e.key === 'g' || e.key === 'G') {
+                setDrawMode('gesture');
+                console.log('[Mode] Switched to GESTURE');
+            } else if (e.key === 'm' || e.key === 'M') {
+                setDrawMode('mouse');
+                console.log('[Mode] Switched to MOUSE');
+            }
+        };
+        window.addEventListener('keydown', handleKey);
+        return () => window.removeEventListener('keydown', handleKey);
+    }, [isDrawer]);
+
     const handleUndo = useCallback(() => {
         // Simple undo: clear canvas (could be improved with stroke stack)
         const canvas = document.querySelector('canvas');
@@ -376,6 +394,8 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
                         playerName={playerName}
                         onSendStroke={handleSendStroke}
                         strokesFromServer={newStrokes}
+                        drawMode={drawMode}
+                        localStream={localStreamRef.current}
                     />
 
                     {/* Palette (Only if Drawer) */}

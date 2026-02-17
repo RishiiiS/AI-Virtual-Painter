@@ -198,7 +198,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                 onClick={() => {
                     if (isHost) {
                         if (canStart) {
-                            onStartGame();
+                            onStartGame(duration);
                         } else {
                             if (guests.length === 0) {
                                 alert("Need at least 2 players!");

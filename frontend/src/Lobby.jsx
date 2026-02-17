@@ -49,8 +49,8 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
     sendChat(roomId, msg, playerName);
   };
 
-  const handleStartGame = () => {
-    startGame(roomId);
+  const handleStartGame = (duration) => {
+    startGame(roomId, duration);
   };
 
   return (

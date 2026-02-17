@@ -1,6 +1,13 @@
 import React from 'react';
 
 const GameHeader = ({ word, timeLeft, isDrawer }) => {
+    const safeTime = typeof timeLeft === 'number' ? timeLeft : 0;
+    const formatTime = (t) => {
+        const mins = Math.floor(t / 60);
+        const secs = t % 60;
+        return `${mins}:${secs < 10 ? '0' + secs : secs}`;
+    };
+
     return (
         <div style={{
             display: 'flex',
@@ -64,27 +71,38 @@ const GameHeader = ({ word, timeLeft, isDrawer }) => {
                     </div>
                     <div style={{
                         fontFamily: '"Titan One", sans-serif',
-                        fontSize: '2.5rem',
-                        color: '#2A8C86'
+                        fontSize: '3rem',
+                        color: safeTime <= 10 ? '#E53935' : '#2A8C86',
+                        animation: safeTime <= 5 && safeTime > 0 ? 'pulse 0.5s ease-in-out infinite alternate' : 'none',
+                        transition: 'color 0.3s ease'
                     }}>
-                        0:{timeLeft < 10 ? `0${timeLeft}` : timeLeft}
+                        {formatTime(safeTime)}
                     </div>
                 </div>
                 <div style={{
                     width: '60px',
                     height: '60px',
-                    backgroundColor: '#333',
+                    backgroundColor: safeTime <= 10 ? '#E53935' : '#333',
                     border: '3px solid #EBC334',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'white',
                     fontSize: '1.5rem',
-                    boxShadow: '4px 4px 0 rgba(0,0,0,0.2)'
+                    boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
+                    transition: 'background-color 0.3s ease'
                 }}>
                     ⏱
                 </div>
             </div>
+
+            {/* Pulse animation for low time */}
+            <style>{`
+                @keyframes pulse {
+                    from { transform: scale(1); }
+                    to { transform: scale(1.1); }
+                }
+            `}</style>
         </div>
     );
 };
