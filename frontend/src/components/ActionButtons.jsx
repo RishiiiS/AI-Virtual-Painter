@@ -17,6 +17,7 @@ const ActionButtons = ({ onCreate, onJoin }) => {
                 cursor: 'pointer',
                 transition: 'transform 0.1s',
             }}
+                className="btn-sound"
                 onClick={onCreate}
                 onMouseDown={(e) => e.target.style.transform = 'translate(2px, 2px)'}
                 onMouseUp={(e) => e.target.style.transform = 'translate(0, 0)'}
@@ -37,6 +38,7 @@ const ActionButtons = ({ onCreate, onJoin }) => {
                 cursor: 'pointer',
                 transition: 'transform 0.1s',
             }}
+                className="btn-sound"
                 onClick={onJoin}
                 onMouseDown={(e) => e.target.style.transform = 'translate(2px, 2px)'}
                 onMouseUp={(e) => e.target.style.transform = 'translate(0, 0)'}

@@ -8,6 +8,8 @@ import PlayerList from './components/PlayerList';
 import { getState, sendChat, joinRoom, sendStroke, getStrokes } from './api';
 import { joinSignalingRoom, sendOffer, sendAnswer, sendIceCandidate, onNewGuesser, onOffer, onAnswer, onIceCandidate, disconnectSignaling } from './signaling';
 
+import SoundManager from './utils/SoundManager'; // Import SoundManager
+
 const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 const Game = ({ playerName, roomId, isHost, onEndGame }) => {
@@ -37,6 +39,13 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
             });
         }
     }, [roomId, playerName]);
+
+    // Sync round active state to SoundManager
+    useEffect(() => {
+        if (gameState) {
+            SoundManager.setRoundActive(gameState.round_active);
+        }
+    }, [gameState?.round_active]);
 
     // Drawer WebRTC: one peer connection per guesser (mesh model)
     useEffect(() => {
@@ -337,6 +346,7 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
                 word={gameState.current_word}
                 timeLeft={gameState.time_remaining}
                 isDrawer={isDrawer}
+                isRoundActive={gameState.round_active}
             />
 
             <div style={{

@@ -81,6 +81,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                                 <button
                                     key={sec}
                                     onClick={() => setDuration(sec)}
+                                    className="btn-sound"
                                     style={{
                                         flex: 1,
                                         padding: '10px',
@@ -195,6 +196,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                 color: '#333',
                 opacity: (isHost && !canStart) ? 0.6 : 1
             }}
+                className="btn-sound"
                 onClick={() => {
                     if (isHost) {
                         if (canStart) {

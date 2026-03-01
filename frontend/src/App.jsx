@@ -10,8 +10,21 @@ import Game from './Game'
 import Lobby from './Lobby'
 import JoinRoom from './components/JoinRoom'
 import { checkRoom, createRoom } from './api';
+import SoundManager from './utils/SoundManager'; // Import SoundManager
 
 function App() {
+  // Global click sound
+  React.useEffect(() => {
+    const handleGlobalClick = (e) => {
+      // Strict check: Play only for elements explicitly marked with 'btn-sound' class
+      if (e.target.closest('.btn-sound')) {
+        SoundManager.playClick();
+      }
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
+
   const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join' | 'game'
   const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState('room1'); // Default

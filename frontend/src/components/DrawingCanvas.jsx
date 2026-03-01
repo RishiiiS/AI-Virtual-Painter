@@ -300,6 +300,7 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
                         left: 0,
                         width: '100%',
                         height: '100%',
+                        objectFit: 'contain',
                         pointerEvents: 'none',
                         zIndex: 10
                     }}

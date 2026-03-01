@@ -53,6 +53,7 @@ const JoinRoom = ({ onJoin, onBack }) => {
                     cursor: 'pointer',
                     boxShadow: '4px 4px 0 #333'
                 }}
+                    className="btn-sound"
                     onClick={onBack}
                 >
                     BACK
@@ -69,6 +70,7 @@ const JoinRoom = ({ onJoin, onBack }) => {
                     cursor: 'pointer',
                     boxShadow: '4px 4px 0 #333'
                 }}
+                    className="btn-sound"
                     onClick={async () => {
                         if (!roomCode) return;
                         const status = await checkRoom(roomCode);

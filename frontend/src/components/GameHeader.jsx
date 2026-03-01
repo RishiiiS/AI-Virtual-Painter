@@ -1,7 +1,19 @@
 import React from 'react';
 
-const GameHeader = ({ word, timeLeft, isDrawer }) => {
+import SoundManager from '../utils/SoundManager';
+
+const GameHeader = ({ word, timeLeft, isDrawer, isRoundActive }) => {
     const safeTime = typeof timeLeft === 'number' ? timeLeft : 0;
+
+    // Play timer sound when low time
+    React.useEffect(() => {
+        if (isRoundActive && safeTime <= 15 && safeTime > 0) {
+            SoundManager.playTimer();
+        } else {
+            SoundManager.stopTimer();
+        }
+    }, [safeTime, isRoundActive]);
+
     const formatTime = (t) => {
         const mins = Math.floor(t / 60);
         const secs = t % 60;
