@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { sendReady } from '../api';
+import { Check } from 'lucide-react';
 
 const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], playerName }) => {
     const [duration, setDuration] = useState(60);
@@ -157,7 +158,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                                     color: 'white',
                                     border: '2px solid #333'
                                 }}>
-                                    {settings[key] && '✓'}
+                                    {settings[key] && <Check size={18} strokeWidth={4} />}
                                 </div>
                                 {label}
                             </div>

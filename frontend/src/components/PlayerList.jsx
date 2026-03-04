@@ -1,4 +1,5 @@
 import React from 'react';
+import { Ghost, Crown, User } from 'lucide-react';
 
 const PlayerList = ({ players: initialPlayers = [] }) => {
     let players = initialPlayers;
@@ -44,7 +45,7 @@ const PlayerList = ({ players: initialPlayers = [] }) => {
                             justifyContent: 'center',
                             fontSize: '2rem'
                         }}>
-                            {p.avatar === 'alien' ? '👾' : p.avatar}
+                            {p.avatar === 'alien' || p.avatar === 'Ghost' ? <Ghost size={28} strokeWidth={2} /> : <User size={28} strokeWidth={2} />}
                         </div>
 
                         {/* Info */}
@@ -57,7 +58,7 @@ const PlayerList = ({ players: initialPlayers = [] }) => {
                                 gap: '5px'
                             }}>
                                 {p.name}
-                                {p.isHost && <span title="Host">👑</span>}
+                                {p.isHost && <span title="Host" style={{ display: 'flex', alignItems: 'center', color: '#EBC334' }}><Crown size={16} strokeWidth={2.5} /></span>}
                                 {p.isHost && <span style={{ fontSize: '0.8rem', color: '#666' }}>(HOST)</span>}
                             </div>
 

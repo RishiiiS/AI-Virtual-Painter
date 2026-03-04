@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import useHandTracking from '../hooks/useHandTracking';
+import { Hand, Mouse, Video } from 'lucide-react';
 
 const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId, playerName, onSendStroke, strokesFromServer, drawMode, localStream }) => {
     const canvasRef = useRef(null);
@@ -101,13 +102,29 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
     const getCanvasPoint = useCallback((e) => {
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
-        // Account for CSS scaling (canvas internal size vs displayed size)
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-        return {
-            x: (e.clientX - rect.left) * scaleX,
-            y: (e.clientY - rect.top) * scaleY
-        };
+
+        // Calculate the actual scaled dimensions due to objectFit: 'contain'
+        const scaleX = rect.width / canvas.width;
+        const scaleY = rect.height / canvas.height;
+        const scale = Math.min(scaleX, scaleY); // 'contain' uses the smallest scale ratio
+
+        // Calculate the physical size of the canvas image on screen
+        const renderWidth = canvas.width * scale;
+        const renderHeight = canvas.height * scale;
+
+        // Calculate the padding offsets (letterboxing/pillarboxing)
+        const offsetX = (rect.width - renderWidth) / 2;
+        const offsetY = (rect.height - renderHeight) / 2;
+
+        // Get mouse position relative to the top-left of the actual rendered image
+        let x = (e.clientX - rect.left - offsetX) / scale;
+        let y = (e.clientY - rect.top - offsetY) / scale;
+
+        // Clamp coordinates to strictly stay within the logical 800x600 bounds
+        x = Math.max(0, Math.min(x, canvas.width));
+        y = Math.max(0, Math.min(y, canvas.height));
+
+        return { x, y };
     }, []);
 
     // Keep the gesture stroke callback ref updated with latest color/brush/sender
@@ -121,8 +138,14 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
             if (!canvas) return;
             const ctx = canvas.getContext('2d');
 
-            const strokeColor = s.color === '__CURRENT__' ? color : s.color;
-            const strokeWidth = s.color === '#FFFFFF' ? s.thickness : brushSize;
+            let strokeColor = s.color === '__CURRENT__' ? color : s.color;
+            let strokeWidth = s.color === '#FFFFFF' ? s.thickness : brushSize;
+
+            // If a standard 1-finger gesture stroke but UI UI tool is 'eraser', force erase
+            if (s.color === '__CURRENT__' && tool === 'eraser') {
+                strokeColor = '#FFFFFF';
+                strokeWidth = brushSize * 3;
+            }
 
             // Draw locally using canvas coords — bezier curves for smoothness
             ctx.strokeStyle = strokeColor;
@@ -166,11 +189,15 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
 
         // Index only = draw cursor
         if (fingers[1] === 1 && fingers[2] === 0) {
+            const isEraser = tool === 'eraser';
+            const cursorColor = isEraser ? 'rgba(255, 255, 255, 0.8)' : color;
+            const cursorSize = isEraser ? (brushSize * 3) / 2 + 3 : brushSize / 2 + 3;
+
             ctx.beginPath();
-            ctx.arc(x, y, brushSize / 2 + 3, 0, Math.PI * 2);
-            ctx.fillStyle = color;
+            ctx.arc(x, y, cursorSize, 0, Math.PI * 2);
+            ctx.fillStyle = cursorColor;
             ctx.fill();
-            ctx.strokeStyle = '#000';
+            ctx.strokeStyle = isEraser ? '#999' : '#000';
             ctx.lineWidth = 2;
             ctx.stroke();
         }
@@ -194,7 +221,7 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
             ctx.lineWidth = 2;
             ctx.stroke();
         }
-    }, [gestureState, drawMode, color, brushSize]);
+    }, [gestureState, drawMode, color, brushSize, tool]);
 
     const handleMouseDown = useCallback((e) => {
         if (!isDrawer || drawMode === 'gesture') return;
@@ -342,10 +369,13 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
                         color: 'white',
                         fontSize: '0.8rem',
                         padding: '4px',
-                        textAlign: 'center',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
                         fontFamily: '"Fredoka", sans-serif'
                     }}>
-                        🟢 Live Feed
+                        <Video size={14} color="#00ff00" /> Live Feed
                     </div>
                 </div>
             )}
@@ -373,26 +403,36 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
             {isDrawer && (
                 <div style={{
                     position: 'absolute',
-                    top: '10px',
-                    right: '10px',
-                    backgroundColor: drawMode === 'gesture'
-                        ? 'rgba(0, 200, 100, 0.85)'
-                        : 'rgba(0, 100, 255, 0.85)',
-                    color: 'white',
-                    padding: '6px 14px',
-                    fontFamily: '"Fredoka", sans-serif',
-                    fontSize: '0.75rem',
-                    borderRadius: '20px',
+                    top: '15px',
+                    right: '15px',
+                    backgroundColor: drawMode === 'gesture' ? '#69B578' : '#EBC334',
+                    color: '#333',
+                    border: '3px solid #333',
+                    boxShadow: '4px 4px 0 #333',
+                    padding: '8px 16px',
+                    fontFamily: '"Titan One", sans-serif',
+                    fontSize: '1rem',
+                    textTransform: 'uppercase',
                     zIndex: 25,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)'
+                    gap: '8px',
+                    transition: 'all 0.2s ease'
                 }}>
-                    {drawMode === 'gesture' ? '✋' : '🖱️'}
-                    {drawMode === 'gesture' ? 'GESTURE' : 'MOUSE'}
-                    <span style={{ opacity: 0.7, fontSize: '0.65rem' }}>
-                        ({drawMode === 'gesture' ? 'M→mouse' : 'G→gesture'})
+                    {drawMode === 'gesture' ? <Hand size={20} strokeWidth={2.5} /> : <Mouse size={20} strokeWidth={2.5} />}
+                    <span style={{ marginTop: '2px' }}>{drawMode === 'gesture' ? 'GESTURE MODE' : 'MOUSE MODE'}</span>
+                    <span style={{
+                        backgroundColor: '#fff',
+                        color: '#333',
+                        border: '2px solid #333',
+                        fontFamily: '"Fredoka", sans-serif',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold',
+                        padding: '2px 6px',
+                        marginLeft: '5px',
+                        boxShadow: '2px 2px 0 #333'
+                    }}>
+                        {drawMode === 'gesture' ? 'PRESS M' : 'PRESS G'}
                     </span>
                 </div>
             )}

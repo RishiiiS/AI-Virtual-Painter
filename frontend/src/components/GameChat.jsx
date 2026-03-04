@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { MessageSquare } from 'lucide-react';
 
 const GameChat = ({ messages = [], onSendMessage, currentUser }) => {
     const [inputValue, setInputValue] = useState("");
@@ -47,7 +48,7 @@ const GameChat = ({ messages = [], onSendMessage, currentUser }) => {
                 alignItems: 'center',
                 gap: '10px'
             }}>
-                <span>🗨️</span>
+                <MessageSquare size={20} strokeWidth={3} />
                 <span>GUESSES</span>
             </div>
 

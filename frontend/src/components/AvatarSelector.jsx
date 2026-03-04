@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
+import { Smile, Star, Zap, Cloud, Ghost } from 'lucide-react';
 
 const AvatarSelector = () => {
     const [selected, setSelected] = useState(1);
 
-    // Placeholder avatars (simple emoji/icon style)
-    const avatars = ['👦', '👩', '👴', '👵', '👽'];
+    // Placeholder avatars using Lucide icons
+    const avatars = [
+        <Smile size={32} strokeWidth={2.5} />,
+        <Star size={32} strokeWidth={2.5} />,
+        <Zap size={32} strokeWidth={2.5} />,
+        <Cloud size={32} strokeWidth={2.5} />,
+        <Ghost size={32} strokeWidth={2.5} />
+    ];
 
     return (
         <div style={{ marginBottom: '30px' }}>

@@ -1,6 +1,7 @@
 import React from 'react';
 
 import SoundManager from '../utils/SoundManager';
+import { Timer } from 'lucide-react';
 
 const GameHeader = ({ word, timeLeft, isDrawer, isRoundActive }) => {
     const safeTime = typeof timeLeft === 'number' ? timeLeft : 0;
@@ -104,7 +105,7 @@ const GameHeader = ({ word, timeLeft, isDrawer, isRoundActive }) => {
                     boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
                     transition: 'background-color 0.3s ease'
                 }}>
-                    ⏱
+                    <Timer size={32} strokeWidth={2.5} />
                 </div>
             </div>
 
