@@ -6,7 +6,7 @@ import SettingsPanel from './components/SettingsPanel';
 import ChatPanel from './components/ChatPanel';
 import { getState, sendChat, startGame, joinRoom } from './api';
 
-const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost = false, onGameStart }) => {
+const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost = false, avatarKey = 'star', onGameStart }) => {
   const [chatHistory, setChatHistory] = useState([]);
   const [players, setPlayers] = useState([]);
   const joinedRef = useRef(false);
@@ -15,7 +15,7 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
   useEffect(() => {
     if (!joinedRef.current) {
       joinedRef.current = true;
-      joinRoom(roomId, playerName).then(res => {
+      joinRoom(roomId, playerName, avatarKey).then(res => {
         console.log("Lobby: Joined room", res);
       });
     }
@@ -34,7 +34,7 @@ const Lobby = ({ playerName = "WebPlayer", roomId = 'room1', setRoomId, isHost =
         const backendPlayers = state[roomId].players || [];
         const mappedPlayers = backendPlayers.map(p => ({
           name: p.name,
-          avatar: 'alien',
+          avatar: p.avatar || 'ghost',
           status: p.is_ready ? 'READY' : 'WAITING',
           isHost: p.is_host,
           color: '#EBC334'

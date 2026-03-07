@@ -99,12 +99,12 @@ export const createRoom = async () => {
     }
 };
 
-export const joinRoom = async (roomId, playerName) => {
+export const joinRoom = async (roomId, playerName, avatar = 'star') => {
     try {
         const res = await fetch(`${API_URL}/join_room`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ room_id: roomId, player_name: playerName })
+            body: JSON.stringify({ room_id: roomId, player_name: playerName, avatar: avatar })
         });
         return await res.json();
     } catch (e) {
@@ -144,5 +144,18 @@ export const clearCanvas = async (roomId) => {
         });
     } catch (e) {
         console.error("Clear canvas error:", e);
+    }
+};
+
+export const leaveRoom = async (roomId, playerName) => {
+    try {
+        await fetch(`${API_URL}/leave_room`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId, player_name: playerName }),
+            keepalive: true // Ensures request completes even if page is unloading
+        });
+    } catch (e) {
+        // Silent — we're leaving anyway
     }
 };

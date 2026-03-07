@@ -24,7 +24,9 @@ class GameState:
                     'round_start_time': 0,
                     'round_duration': 60,
                     'chat_history': [],
-                    'latest_video_frame': None
+                    'latest_video_frame': None,
+                    'last_round_results': [],
+                    'last_word': None
                 }
                 print(f"Created new room: {room_id}")
 
@@ -177,12 +179,38 @@ class GameState:
             if room_id in self.rooms:
                 if conn in self.rooms[room_id]['clients']:
                     self.rooms[room_id]['clients'].remove(conn)
+                was_host = False
                 if 'players' in self.rooms[room_id] and conn in self.rooms[room_id]['players']:
+                    was_host = self.rooms[room_id]['players'][conn].get('is_host', False)
                     del self.rooms[room_id]['players'][conn]
-                    
-                # If host left, assign new host? For now, keep it simple.
+                
+                # If the host left, reassign to the next player
+                if was_host and self.rooms[room_id].get('players'):
+                    next_player_key = next(iter(self.rooms[room_id]['players']))
+                    self.rooms[room_id]['players'][next_player_key]['is_host'] = True
+                    new_host = self.rooms[room_id]['players'][next_player_key]['name']
+                    print(f"Host left {room_id}. New host: {new_host}")
 
-    def add_web_client(self, room_id, player_name):
+    def remove_web_client(self, room_id, player_name):
+        """Remove a web player and reassign host if needed."""
+        web_key = f"web_{player_name}"
+        with self.lock:
+            if room_id in self.rooms and 'players' in self.rooms[room_id]:
+                if web_key in self.rooms[room_id]['players']:
+                    was_host = self.rooms[room_id]['players'][web_key].get('is_host', False)
+                    del self.rooms[room_id]['players'][web_key]
+                    print(f"Removed web player {player_name} from {room_id}")
+                    
+                    # If the host left, reassign to the next player
+                    if was_host and self.rooms[room_id].get('players'):
+                        next_player_key = next(iter(self.rooms[room_id]['players']))
+                        self.rooms[room_id]['players'][next_player_key]['is_host'] = True
+                        new_host = self.rooms[room_id]['players'][next_player_key]['name']
+                        print(f"Host left {room_id}. New host: {new_host}")
+                    return True
+        return False
+
+    def add_web_client(self, room_id, player_name, avatar='ghost'):
         """Register a web player using a string key (no TCP socket)."""
         self.create_room_if_missing(room_id)
         with self.lock:
@@ -193,6 +221,8 @@ class GameState:
             
             # Check if already registered
             if web_key in self.rooms[room_id]['players']:
+                # Update avatar in case they changed it
+                self.rooms[room_id]['players'][web_key]['avatar'] = avatar
                 return web_key  # Already registered
             
             # Determine if host (first player is host)
@@ -202,10 +232,11 @@ class GameState:
                 'name': player_name,
                 'score': 0,
                 'is_host': is_host,
-                'is_ready': is_host
+                'is_ready': is_host,
+                'avatar': avatar
             }
             
-            print(f"Added web player {player_name} to {room_id} (Host: {is_host})")
+            print(f"Added web player {player_name} (avatar: {avatar}) to {room_id} (Host: {is_host})")
             return web_key
 
     def is_web_drawer(self, room_id, player_name):
@@ -366,13 +397,12 @@ class GameState:
             if not room.get('round_active'):
                 return None
 
-            # 1. Drawer Bonus
-            # Bonus ONLY if they used "gesture" mode at least once
+            # 1. Drawer Bonus — only if at least one person guessed
             drawer_name = room.get('drawer')
-            if drawer_name:
+            guessed = room.get('guessed_players', set())
+            if drawer_name and len(guessed) > 0:
                 used_gesture = False
                 for s_str in room.get('history', []):
-                    # Check if stroke belongs to current round? 
                     try:
                         s = json.loads(s_str)
                         if s.get('mode') == 'gesture':
@@ -381,28 +411,40 @@ class GameState:
                     except:
                         pass
                 
-                # Bonus Amount
                 bonus = 50 if used_gesture else 0
                 
                 if bonus > 0:
-                    # Update ALL connections for this drawer name
                     for data in room['players'].values():
                         if data['name'] == drawer_name:
                             data['score'] += bonus
+                            data['round_score'] = data.get('round_score', 0) + bonus
                          
             # 2. Prepare Score Summary (Unique Players)
-            unique_scores = {} # name -> score
+            unique_scores = {} # name -> dict
             for data in room['players'].values():
                 name = data['name']
                 score = data['score']
+                round_score = data.get('round_score', 0)
+                avatar = data.get('avatar', 'ghost')
                 # Keep the max score if there's a discrepancy (though sync should prevent it)
-                if name not in unique_scores or score > unique_scores[name]:
-                    unique_scores[name] = score
+                if name not in unique_scores or score > unique_scores[name]['score']:
+                    unique_scores[name] = {'score': score, 'round_score': round_score, 'avatar': avatar}
             
-            scores = [(name, score) for name, score in unique_scores.items()]
+            scores = [(name, d['score'], d['round_score'], d['avatar']) for name, d in unique_scores.items()]
             
             # Sort by score desc
             scores.sort(key=lambda x: x[1], reverse=True)
+            
+            # Store results for the intermission UI
+            room['last_round_results'] = []
+            for name, score, round_score, avatar in scores:
+                room['last_round_results'].append({
+                    'name': name,
+                    'score': score,
+                    'round_score': round_score,
+                    'avatar': avatar
+                })
+            room['last_word'] = room.get('current_word')
             
             # Reset Round State
             room['round_active'] = False
@@ -501,12 +543,14 @@ class GameState:
                     room['guessed_players'].add(player_name)
                     # Score Guesser
                     player_data['score'] += 10
+                    player_data['round_score'] = player_data.get('round_score', 0) + 10
                     
                     # Score Drawer
                     drawer_conn = None
                     for c, data in room['players'].items():
                         if data['name'] == drawer_name:
                             data['score'] += 10 # +10 for drawer per correct guess
+                            data['round_score'] = data.get('round_score', 0) + 10
                             drawer_conn = c
                             # break # Don't break, in case drawer has multiple connections (score all? No just once)
                             # Actually, score is stored in data dict. If multiple connections share same score object?
@@ -522,6 +566,7 @@ class GameState:
                     for c, data in room['players'].items():
                         if data['name'] == player_name:
                              data['score'] = player_data['score']
+                             data['round_score'] = player_data['round_score']
                         if data['name'] == drawer_name:
                              # We already added +10 to one instance. 
                              # Let's just ensure drawer score is consistent if we had central score.

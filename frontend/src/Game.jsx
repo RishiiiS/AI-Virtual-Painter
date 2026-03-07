@@ -5,14 +5,15 @@ import DrawingCanvas from './components/DrawingCanvas';
 import Palette from './components/Palette';
 import GameChat from './components/GameChat';
 import PlayerList from './components/PlayerList';
-import { getState, sendChat, joinRoom, sendStroke, getStrokes } from './api';
+import ResultPage from './components/ResultPage';
+import { getState, sendChat, joinRoom, leaveRoom, sendStroke, getStrokes } from './api';
 import { joinSignalingRoom, sendOffer, sendAnswer, sendIceCandidate, onNewGuesser, onOffer, onAnswer, onIceCandidate, disconnectSignaling } from './signaling';
 
 import SoundManager from './utils/SoundManager'; // Import SoundManager
 
 const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-const Game = ({ playerName, roomId, isHost, onEndGame }) => {
+const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => {
     const [gameState, setGameState] = useState(null);
     const [selectedTool, setSelectedTool] = useState('brush');
     const [selectedColor, setSelectedColor] = useState('#333333');
@@ -34,10 +35,21 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
     useEffect(() => {
         if (!joinedRef.current) {
             joinedRef.current = true;
-            joinRoom(roomId, playerName).then(res => {
+            joinRoom(roomId, playerName, avatarKey).then(res => {
                 console.log("Joined room:", res);
             });
         }
+    }, [roomId, playerName]);
+
+    // Notify backend when player closes tab or refreshes
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            leaveRoom(roomId, playerName);
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
     }, [roomId, playerName]);
 
     // Sync round active state to SoundManager
@@ -323,12 +335,26 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
     // Transform players for PlayerList
     const displayPlayers = (gameState.players || []).map(p => ({
         name: p.name,
-        avatar: 'alien',
+        avatar: p.avatar || 'ghost',
         status: p.name === gameState.drawer ? 'DRAWING' : 'GUESSING',
         score: p.score,
         isHost: p.is_host,
         color: '#EBC334'
     }));
+
+    if (!gameState.round_active && gameState.last_round_results && gameState.last_round_results.length > 0) {
+        return (
+            <div style={{ width: '100vw', height: '100vh', position: 'fixed', top: 0, left: 0, zIndex: 1000 }}>
+                <ResultPage
+                    word={gameState.last_word}
+                    results={gameState.last_round_results}
+                    roomId={roomId}
+                    timeRemaining={gameState.time_remaining}
+                    onNextRound={() => { }}
+                />
+            </div>
+        );
+    }
 
     return (
         <div style={{
@@ -355,7 +381,8 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
                 justifyContent: 'center',
                 gap: '20px',
                 flex: 1,
-                minHeight: 0
+                minHeight: 0,
+                marginTop: '10px'
             }}>
 
                 {/* Left: Toolbar */}
@@ -440,7 +467,6 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
                         />
                     </div>
                 </div>
-
             </div>
         </div>
     );

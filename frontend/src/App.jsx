@@ -3,6 +3,7 @@ import React, { useState } from 'react'
 import './App.css'
 import Header from './components/Header'
 import AvatarSelector from './components/AvatarSelector'
+import { AVATAR_KEYS } from './components/AvatarIcon'
 import NicknameInput from './components/NicknameInput'
 import ActionButtons from './components/ActionButtons'
 import Footer from './components/Footer'
@@ -29,6 +30,9 @@ function App() {
   const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState('room1'); // Default
   const [isHost, setIsHost] = useState(false);
+  const [selectedAvatar, setSelectedAvatar] = useState(1);
+
+  const [nicknameError, setNicknameError] = useState('');
 
   if (view === 'game') {
     return (
@@ -42,6 +46,7 @@ function App() {
           playerName={nickname || "WebPlayer"}
           roomId={roomId}
           isHost={isHost}
+          avatarKey={AVATAR_KEYS[selectedAvatar] || 'star'}
           onEndGame={() => setView('landing')}
         />
       </div>
@@ -61,6 +66,7 @@ function App() {
           roomId={roomId}
           setRoomId={setRoomId}
           isHost={isHost}
+          avatarKey={AVATAR_KEYS[selectedAvatar] || 'star'}
           onGameStart={() => setView('game')}
         />
       </div>
@@ -108,12 +114,23 @@ function App() {
 
           {view === 'landing' ? (
             <>
-              <AvatarSelector />
-              <NicknameInput value={nickname} onChange={setNickname} />
+              <AvatarSelector selected={selectedAvatar} onSelect={setSelectedAvatar} />
+              <NicknameInput value={nickname} onChange={(val) => { setNickname(val); setNicknameError(''); }} />
+              {nicknameError && (
+                <div style={{
+                  color: '#D96C2C',
+                  fontFamily: '"Fredoka", sans-serif',
+                  fontWeight: 'bold',
+                  marginBottom: '15px',
+                  fontSize: '1.1rem'
+                }}>
+                  {nicknameError}
+                </div>
+              )}
               <ActionButtons
                 onCreate={async () => {
                   if (!nickname.trim()) {
-                    alert("PLEASE ENTER A NICKNAME FIRST!");
+                    setNicknameError("PLEASE ENTER A NICKNAME FIRST!");
                     return;
                   }
                   const res = await createRoom();
@@ -122,12 +139,12 @@ function App() {
                     setIsHost(true);
                     setView('lobby');
                   } else {
-                    alert("Failed to create room: " + (res.error || "Unknown error"));
+                    setNicknameError("Failed to create room: " + (res.error || "Unknown error"));
                   }
                 }}
                 onJoin={() => {
                   if (!nickname.trim()) {
-                    alert("PLEASE ENTER A NICKNAME FIRST!");
+                    setNicknameError("PLEASE ENTER A NICKNAME FIRST!");
                     return;
                   }
                   setView('join');
@@ -138,7 +155,7 @@ function App() {
             <JoinRoom
               onJoin={(code) => {
                 if (!nickname.trim()) {
-                  alert("PLEASE ENTER A NICKNAME FIRST!");
+                  setNicknameError("PLEASE ENTER A NICKNAME FIRST!");
                   return;
                 }
                 setRoomId(code);

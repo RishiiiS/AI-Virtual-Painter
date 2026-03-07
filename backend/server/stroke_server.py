@@ -129,7 +129,9 @@ def finish_round(room_id):
     print(f"\n=== ROUND OVER: {room_id} ===")
     print("SCORES:")
     msg_payload = "ROUND OVER! SCORES:\n"
-    for name, score in scores:
+    for entry in scores:
+        name = entry[0]
+        score = entry[1]
         line = f"- {name}: {score}"
         print(line)
         msg_payload += line + "\n"
@@ -154,13 +156,13 @@ def finish_round(room_id):
     })
     broadcast(room_id, round_over_msg)
     
-    # 5. Auto-Start Next Round in 1 second (preserve room duration)
+    # 5. Auto-Start Next Round in 10 seconds (preserve room duration)
     room_duration = 60
     with game_state.lock:
         if room_id in game_state.rooms:
             room_duration = game_state.rooms[room_id].get('room_duration', 60)
-    print(f"Scheduling next round for {room_id} in 1s (duration={room_duration}s)...")
-    t = threading.Timer(1.0, handle_start_game, args=[room_id, None], kwargs={'duration': room_duration}) 
+    print(f"Scheduling next round for {room_id} in 10s (duration={room_duration}s)...")
+    t = threading.Timer(10.0, handle_start_game, args=[room_id, None], kwargs={'duration': room_duration}) 
     t.start()
 
 def handle_time_expiry(room_id):
@@ -304,6 +306,12 @@ def handle_start_game(room_id, sender_conn=None, duration=60):
     with game_state.lock:
         if room_id in game_state.rooms:
             game_state.rooms[room_id]['history'] = []
+            # Clear intermission data so ResultPage hides
+            game_state.rooms[room_id]['last_round_results'] = []
+            game_state.rooms[room_id]['last_word'] = None
+            # Reset round scores
+            for player in game_state.rooms[room_id].get('players', {}).values():
+                player['round_score'] = 0
     
     # 1. Select Drawer
     drawer_name = game_state.select_drawer(room_id)

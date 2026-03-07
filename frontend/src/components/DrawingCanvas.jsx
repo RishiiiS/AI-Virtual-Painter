@@ -24,8 +24,8 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
     const gestureState = useHandTracking(
         localStream,
         isDrawer && drawMode === 'gesture',
-        800,
-        600,
+        1280,
+        720,
         handleGestureStroke  // Direct callback — bypasses React render cycle
     );
 
@@ -103,22 +103,13 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
 
-        // Calculate the actual scaled dimensions due to objectFit: 'contain'
+        // Canvas is stretched to fill container, calculate raw scale across both axes
         const scaleX = rect.width / canvas.width;
         const scaleY = rect.height / canvas.height;
-        const scale = Math.min(scaleX, scaleY); // 'contain' uses the smallest scale ratio
 
-        // Calculate the physical size of the canvas image on screen
-        const renderWidth = canvas.width * scale;
-        const renderHeight = canvas.height * scale;
-
-        // Calculate the padding offsets (letterboxing/pillarboxing)
-        const offsetX = (rect.width - renderWidth) / 2;
-        const offsetY = (rect.height - renderHeight) / 2;
-
-        // Get mouse position relative to the top-left of the actual rendered image
-        let x = (e.clientX - rect.left - offsetX) / scale;
-        let y = (e.clientY - rect.top - offsetY) / scale;
+        // Get mouse position relative to the top-left of the stretched canvas
+        let x = (e.clientX - rect.left) / scaleX;
+        let y = (e.clientY - rect.top) / scaleY;
 
         // Clamp coordinates to strictly stay within the logical 800x600 bounds
         x = Math.max(0, Math.min(x, canvas.width));
@@ -298,12 +289,12 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
         }}>
             <canvas
                 ref={canvasRef}
-                width={800}
-                height={600}
+                width={1280}
+                height={720}
                 style={{
                     width: '100%',
                     height: '100%',
-                    objectFit: 'contain',
+                    display: 'block',
                     cursor: isDrawer
                         ? (drawMode === 'gesture' ? 'none' : (tool === 'eraser' ? 'cell' : 'crosshair'))
                         : 'default'
@@ -319,15 +310,15 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
             {isDrawer && drawMode === 'gesture' && (
                 <canvas
                     ref={gestureOverlayRef}
-                    width={800}
-                    height={600}
+                    width={1280}
+                    height={720}
                     style={{
                         position: 'absolute',
                         top: 0,
                         left: 0,
                         width: '100%',
                         height: '100%',
-                        objectFit: 'contain',
+                        display: 'block',
                         pointerEvents: 'none',
                         zIndex: 10
                     }}
