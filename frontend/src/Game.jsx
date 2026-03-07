@@ -349,7 +349,6 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
                     word={gameState.last_word}
                     results={gameState.last_round_results}
                     roomId={roomId}
-                    timeRemaining={gameState.time_remaining}
                     onNextRound={() => { }}
                 />
             </div>

@@ -192,14 +192,30 @@ class GameState:
                     print(f"Host left {room_id}. New host: {new_host}")
 
     def remove_web_client(self, room_id, player_name):
-        """Remove a web player and reassign host if needed."""
+        """Remove a web player and reassign host if needed.
+        Returns dict: {'removed': bool, 'was_drawer': bool}
+        """
         web_key = f"web_{player_name}"
+        result = {'removed': False, 'was_drawer': False}
         with self.lock:
             if room_id in self.rooms and 'players' in self.rooms[room_id]:
                 if web_key in self.rooms[room_id]['players']:
                     was_host = self.rooms[room_id]['players'][web_key].get('is_host', False)
+                    
+                    # Check if this player was the active drawer
+                    room = self.rooms[room_id]
+                    if room.get('round_active') and room.get('drawer') == player_name:
+                        result['was_drawer'] = True
+                        # Cancel the current round timer
+                        self.cancel_timer(room_id)
+                        # Reset round state
+                        room['round_active'] = False
+                        room['guessed_players'] = set()
+                        room['drawer'] = None
+                    
                     del self.rooms[room_id]['players'][web_key]
                     print(f"Removed web player {player_name} from {room_id}")
+                    result['removed'] = True
                     
                     # If the host left, reassign to the next player
                     if was_host and self.rooms[room_id].get('players'):
@@ -207,8 +223,7 @@ class GameState:
                         self.rooms[room_id]['players'][next_player_key]['is_host'] = True
                         new_host = self.rooms[room_id]['players'][next_player_key]['name']
                         print(f"Host left {room_id}. New host: {new_host}")
-                    return True
-        return False
+        return result
 
     def add_web_client(self, room_id, player_name, avatar='ghost'):
         """Register a web player using a string key (no TCP socket)."""

@@ -1,7 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import AvatarIcon from './AvatarIcon';
 
-const ResultPage = ({ word, results = [], roomId, onNextRound, timeRemaining }) => {
+const ResultPage = ({ word, results = [], roomId, onNextRound }) => {
+    // Local countdown timer (10 seconds)
+    const [countdown, setCountdown] = useState(10);
+
+    useEffect(() => {
+        setCountdown(10); // Reset on mount
+        const timer = setInterval(() => {
+            setCountdown(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, []);
     // Top 3 players logic
     const topPlayers = results.slice(0, 3);
 
@@ -170,7 +186,7 @@ const ResultPage = ({ word, results = [], roomId, onNextRound, timeRemaining }) 
                         whiteSpace: 'nowrap'
                     }}>
                         NEXT ROUND
-                        <span style={{ fontFamily: '"Fredoka", sans-serif', fontSize: '1.1rem', color: '#666', fontWeight: 'bold' }}>({timeRemaining}s)</span>
+                        <span style={{ fontFamily: '"Fredoka", sans-serif', fontSize: '1.1rem', color: '#666', fontWeight: 'bold' }}>({countdown}s)</span>
                     </div>
                 </div>
 

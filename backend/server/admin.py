@@ -85,12 +85,20 @@ def get_state():
                 elapsed = _time.time() - start
                 time_remaining = max(0, int(duration - elapsed))
 
+            # Intermission countdown (time until next round starts)
+            intermission_remaining = 0
+            intermission_end = room_data.get('intermission_end_time')
+            if intermission_end and not room_data.get('round_active', False):
+                import time as _time2
+                intermission_remaining = max(0, int(intermission_end - _time2.time()))
+
             state_dump[room_id] = {
                 "round_active": room_data.get('round_active', False),
                 "drawer": room_data.get('drawer'),
                 "current_word": room_data.get('current_word'),
                 "last_word": room_data.get('last_word'),
                 "time_remaining": time_remaining,
+                "intermission_remaining": intermission_remaining,
                 "player_count": len(players_list),
                 "players": players_list,
                 "chat_history": room_data.get('chat_history', []),
@@ -483,8 +491,37 @@ def leave_room():
     if not room_id or not player_name:
         return jsonify({"error": "Missing room_id or player_name"}), 400
     
-    removed = game_state_ref.remove_web_client(room_id, player_name)
-    return jsonify({"status": "left" if removed else "not_found"})
+    result = game_state_ref.remove_web_client(room_id, player_name)
+    
+    # If the drawer left mid-round, immediately start a new round with remaining players
+    if result.get('was_drawer') and stroke_server_module:
+        # Check there are still players in the room
+        has_players = False
+        with game_state_ref.lock:
+            if room_id in game_state_ref.rooms:
+                has_players = len(game_state_ref.rooms[room_id].get('players', {})) > 0
+        
+        if has_players:
+            # Broadcast drawer-left message
+            import json as _json
+            from protocol import Protocol as _Proto
+            sys_msg = _json.dumps({
+                _Proto.ACTION: _Proto.CHAT,
+                _Proto.PAYLOAD: f"SYSTEM: The drawer ({player_name}) left! Starting a new round..."
+            })
+            stroke_server_module.broadcast(room_id, sys_msg)
+            
+            # Get room duration and start new round immediately
+            room_duration = 60
+            with game_state_ref.lock:
+                if room_id in game_state_ref.rooms:
+                    room_duration = game_state_ref.rooms[room_id].get('room_duration', 60)
+            
+            import threading
+            t = threading.Timer(2.0, stroke_server_module.handle_start_game, args=[room_id, None], kwargs={'duration': room_duration})
+            t.start()
+    
+    return jsonify({"status": "left" if result.get('removed') else "not_found"})
 
 @app.route('/api/send_stroke', methods=['POST'])
 def send_stroke():

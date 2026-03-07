@@ -1,6 +1,7 @@
 import socket
 import json
 import threading
+import time
 import sys
 import os
 
@@ -113,57 +114,66 @@ def handle_client(conn, addr):
             game_state.remove_client(room_id, conn)
 
 def finish_round(room_id):
-    print(f"DEBUG: finish_round called for {room_id}")
-    # 1. End Round & Get Scores
+    print(f"DEBUG: finish_round called for {room_id}", flush=True)
     try:
-        scores = game_state.end_round(room_id)
-    except Exception as e:
-        print(f"ERROR in end_round: {e}")
-        scores = None
-        
-    if scores is None: 
-        print("DEBUG: end_round returned None (Round not active?)")
-        return # Round already ended or invalid
+        # 1. End Round & Get Scores
+        try:
+            scores = game_state.end_round(room_id)
+        except Exception as e:
+            print(f"ERROR in end_round: {e}", flush=True)
+            import traceback; traceback.print_exc()
+            scores = None
+            
+        if scores is None: 
+            print("DEBUG: end_round returned None (Round not active?)", flush=True)
+            return # Round already ended or invalid
 
-    # 2. Print Scores to Server Console
-    print(f"\n=== ROUND OVER: {room_id} ===")
-    print("SCORES:")
-    msg_payload = "ROUND OVER! SCORES:\n"
-    for entry in scores:
-        name = entry[0]
-        score = entry[1]
-        line = f"- {name}: {score}"
-        print(line)
-        msg_payload += line + "\n"
-    
-    if scores:
-        winner = scores[0][0]
-        print(f"WINNER: {winner}")
-        msg_payload += f"WINNER: {winner}"
-    print("==========================\n")
-    
-    # 3. Broadcast Scores
-    score_msg = json.dumps({
-        Protocol.ACTION: Protocol.CHAT,
-        Protocol.PAYLOAD: msg_payload
-    })
-    broadcast(room_id, score_msg)
-    
-    # 4. Broadcast ROUND_OVER to reset clients
-    print("DEBUG: Broadcasting ROUND_OVER")
-    round_over_msg = json.dumps({
-        Protocol.ACTION: Protocol.ROUND_OVER
-    })
-    broadcast(room_id, round_over_msg)
-    
-    # 5. Auto-Start Next Round in 10 seconds (preserve room duration)
-    room_duration = 60
-    with game_state.lock:
-        if room_id in game_state.rooms:
-            room_duration = game_state.rooms[room_id].get('room_duration', 60)
-    print(f"Scheduling next round for {room_id} in 10s (duration={room_duration}s)...")
-    t = threading.Timer(10.0, handle_start_game, args=[room_id, None], kwargs={'duration': room_duration}) 
-    t.start()
+        # 2. Print Scores to Server Console
+        print(f"\n=== ROUND OVER: {room_id} ===", flush=True)
+        print("SCORES:", flush=True)
+        msg_payload = "ROUND OVER! SCORES:\n"
+        for entry in scores:
+            name = entry[0]
+            score = entry[1]
+            line = f"- {name}: {score}"
+            print(line)
+            msg_payload += line + "\n"
+        
+        if scores:
+            winner = scores[0][0]
+            print(f"WINNER: {winner}")
+            msg_payload += f"WINNER: {winner}"
+        print("==========================\n")
+        
+        # 3. Broadcast Scores
+        score_msg = json.dumps({
+            Protocol.ACTION: Protocol.CHAT,
+            Protocol.PAYLOAD: msg_payload
+        })
+        broadcast(room_id, score_msg)
+        
+        # 4. Broadcast ROUND_OVER to reset clients
+        print("DEBUG: Broadcasting ROUND_OVER", flush=True)
+        round_over_msg = json.dumps({
+            Protocol.ACTION: Protocol.ROUND_OVER
+        })
+        broadcast(room_id, round_over_msg)
+        
+        # 5. Auto-Start Next Round in 10 seconds (preserve room duration)
+        room_duration = 60
+        with game_state.lock:
+            if room_id in game_state.rooms:
+                room_duration = game_state.rooms[room_id].get('room_duration', 60)
+                # Store when the intermission ends so frontend can show countdown
+                game_state.rooms[room_id]['intermission_end_time'] = time.time() + 10.0
+        print(f"Scheduling next round for {room_id} in 10s (duration={room_duration}s)...", flush=True)
+        t = threading.Timer(10.0, handle_start_game, args=[room_id, None], kwargs={'duration': room_duration}) 
+        t.daemon = True
+        t.start()
+        print(f"Timer started successfully for {room_id}", flush=True)
+    except Exception as e:
+        print(f"CRITICAL ERROR in finish_round: {e}", flush=True)
+        import traceback; traceback.print_exc()
 
 def handle_time_expiry(room_id):
     print(f"Timer expired for {room_id}")
