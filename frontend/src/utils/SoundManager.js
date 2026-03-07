@@ -1,5 +1,5 @@
 import clickSound from '../assets/sounds/clicks.wav';
-import timerSound from '../assets/sounds/timer.wav';
+import timerSound from '../assets/sounds/freesound_community-ticking-timer-65220.mp3';
 
 class SoundManager {
     constructor() {

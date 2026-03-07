@@ -112,6 +112,10 @@ function App() {
               <NicknameInput value={nickname} onChange={setNickname} />
               <ActionButtons
                 onCreate={async () => {
+                  if (!nickname.trim()) {
+                    alert("PLEASE ENTER A NICKNAME FIRST!");
+                    return;
+                  }
                   const res = await createRoom();
                   if (res.room_id) {
                     setRoomId(res.room_id);
@@ -121,12 +125,22 @@ function App() {
                     alert("Failed to create room: " + (res.error || "Unknown error"));
                   }
                 }}
-                onJoin={() => setView('join')}
+                onJoin={() => {
+                  if (!nickname.trim()) {
+                    alert("PLEASE ENTER A NICKNAME FIRST!");
+                    return;
+                  }
+                  setView('join');
+                }}
               />
             </>
           ) : (
             <JoinRoom
               onJoin={(code) => {
+                if (!nickname.trim()) {
+                  alert("PLEASE ENTER A NICKNAME FIRST!");
+                  return;
+                }
                 setRoomId(code);
                 setIsHost(false);
                 setView('lobby');

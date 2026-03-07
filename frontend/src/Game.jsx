@@ -16,7 +16,7 @@ const Game = ({ playerName, roomId, isHost, onEndGame }) => {
     const [gameState, setGameState] = useState(null);
     const [selectedTool, setSelectedTool] = useState('brush');
     const [selectedColor, setSelectedColor] = useState('#333333');
-    const [brushSize, setBrushSize] = useState(5);
+    const [brushSize, setBrushSize] = useState(10);
     const [isDrawer, setIsDrawer] = useState(false);
     const [drawMode, setDrawMode] = useState('mouse'); // 'mouse' or 'gesture'
     const [remoteStream, setRemoteStream] = useState(null);

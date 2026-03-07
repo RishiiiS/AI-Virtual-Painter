@@ -87,12 +87,19 @@ export default function useHandTracking(stream, enabled, canvasWidth = 800, canv
         const landmarks = results.multiHandLandmarks[0];
         const fingers = fingersUp(landmarks);
 
+        const scalePoint = (p) => {
+            // Expand active area so user doesn't have to absolute edge of camera
+            const expandFactor = 1.4;
+            const nx = Math.max(0, Math.min(1, (p.x - 0.5) * expandFactor + 0.5));
+            const ny = Math.max(0, Math.min(1, (p.y - 0.5) * expandFactor + 0.5));
+            return {
+                x: (1 - nx) * canvasWidth, // Mirror X
+                y: ny * canvasHeight
+            };
+        };
+
         // Index fingertip — normalized (0-1), scale to canvas
-        // Mirror X axis since webcam is not flipped but user faces camera
-        const indexTip = landmarks[8];
-        // Use float coordinates for sub-pixel precision (no Math.round)
-        const rawX = (1 - indexTip.x) * canvasWidth;   // Mirror X
-        const rawY = indexTip.y * canvasHeight;
+        const { x: rawX, y: rawY } = scalePoint(landmarks[8]);
 
         let stroke = null;
         const currentGesture = `${fingers.join(',')}`;
@@ -149,12 +156,8 @@ export default function useHandTracking(stream, enabled, canvasWidth = 800, canv
         }
         // Eraser mode: ALL fingers up
         else if (fingers[1] === 1 && fingers[2] === 1 && fingers[3] === 1 && fingers[4] === 1) {
-            const thumbTip = landmarks[4];
-            const pinkyTip = landmarks[20];
-            const tx = (1 - thumbTip.x) * canvasWidth;
-            const ty = thumbTip.y * canvasHeight;
-            const pkx = (1 - pinkyTip.x) * canvasWidth;
-            const pky = pinkyTip.y * canvasHeight;
+            const { x: tx, y: ty } = scalePoint(landmarks[4]);
+            const { x: pkx, y: pky } = scalePoint(landmarks[20]);
 
             const scaleX = 1280 / canvasWidth;
             const scaleY = 720 / canvasHeight;
@@ -249,35 +252,26 @@ export default function useHandTracking(stream, enabled, canvasWidth = 800, canv
         handsRef.current = hands;
 
         // Manual frame processing loop (no Camera utility — avoids double getUserMedia)
-        let busy = false;
-        let stallCount = 0;
+        let lastVideoTime = -1;
 
-        const processFrame = () => {
+        const processFrame = async () => {
             if (!active) return;
 
-            // Always schedule next frame first — keeps loop alive even if send() stalls
-            rafRef.current = requestAnimationFrame(processFrame);
-
-            // Skip if previous send is still in-flight
-            if (busy) {
-                stallCount++;
-                if (stallCount > 90) { // ~1.5s stall → reset
-                    console.warn('[HandTracking] MediaPipe stalled, resetting busy flag');
-                    busy = false;
-                    stallCount = 0;
+            if (video.readyState >= 2 && handsRef.current) {
+                // Determine if video is a local stream or file. If stream, currentTime may not reliably update,
+                // but checking it when available helps prevent MedaiPipe from dropping identical frames.
+                if (video.currentTime !== lastVideoTime) {
+                    lastVideoTime = video.currentTime;
+                    try {
+                        await handsRef.current.send({ image: video });
+                    } catch (e) {
+                        console.warn('[HandTracking] send error:', e?.message);
+                    }
                 }
-                return;
             }
 
-            if (video.readyState >= 2 && handsRef.current) {
-                busy = true;
-                stallCount = 0;
-                handsRef.current.send({ image: video }).then(() => {
-                    busy = false;
-                }).catch((e) => {
-                    console.warn('[HandTracking] send error:', e?.message);
-                    busy = false;
-                });
+            if (active) {
+                rafRef.current = requestAnimationFrame(processFrame);
             }
         };
 
