@@ -557,15 +557,15 @@ class GameState:
                 if player_name not in room['guessed_players']:
                     room['guessed_players'].add(player_name)
                     # Score Guesser
-                    player_data['score'] += 10
-                    player_data['round_score'] = player_data.get('round_score', 0) + 10
+                    player_data['score'] += 100
+                    player_data['round_score'] = player_data.get('round_score', 0) + 100
                     
                     # Score Drawer
                     drawer_conn = None
                     for c, data in room['players'].items():
                         if data['name'] == drawer_name:
-                            data['score'] += 10 # +10 for drawer per correct guess
-                            data['round_score'] = data.get('round_score', 0) + 10
+                            data['score'] += 100 # +100 for drawer per correct guess
+                            data['round_score'] = data.get('round_score', 0) + 100
                             drawer_conn = c
                             # break # Don't break, in case drawer has multiple connections (score all? No just once)
                             # Actually, score is stored in data dict. If multiple connections share same score object?

@@ -244,14 +244,14 @@ def perform_action():
                             
                             # Score the guesser
                             if web_key in room['players']:
-                                room['players'][web_key]['score'] += 10
-                                room['players'][web_key]['round_score'] = room['players'][web_key].get('round_score', 0) + 10
+                                room['players'][web_key]['score'] += 100
+                                room['players'][web_key]['round_score'] = room['players'][web_key].get('round_score', 0) + 100
                             
-                            # Score the drawer (+10 per correct guess)
+                            # Score the drawer (+100 per correct guess)
                             for c, pdata in room['players'].items():
                                 if pdata['name'] == drawer_name:
-                                    pdata['score'] += 10
-                                    pdata['round_score'] = pdata.get('round_score', 0) + 10
+                                    pdata['score'] += 100
+                                    pdata['round_score'] = pdata.get('round_score', 0) + 100
                                     break
                             
                             # Check if ALL guessers have guessed
@@ -281,7 +281,7 @@ def perform_action():
         if guess_result == "correct":
             sys_msg = json.dumps({
                 Protocol.ACTION: Protocol.CHAT,
-                Protocol.PAYLOAD: f"SYSTEM: {sender} guessed the word! (+10 pts)"
+                Protocol.PAYLOAD: f"SYSTEM: {sender} guessed the word! (+100 pts)"
             })
             stroke_server_module.broadcast(room_id, sys_msg)
             return jsonify({"status": "correct"})
@@ -289,7 +289,7 @@ def perform_action():
         if guess_result == "round_over":
             sys_msg = json.dumps({
                 Protocol.ACTION: Protocol.CHAT,
-                Protocol.PAYLOAD: f"SYSTEM: {sender} guessed the word! (+10 pts)"
+                Protocol.PAYLOAD: f"SYSTEM: {sender} guessed the word! (+100 pts)"
             })
             stroke_server_module.broadcast(room_id, sys_msg)
             stroke_server_module.finish_round(room_id)

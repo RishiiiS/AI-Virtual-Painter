@@ -6,7 +6,6 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
     const [duration, setDuration] = useState(60);
     const [settings, setSettings] = useState({
         quickChat: true,
-        powerUps: true,
         difficulty: 1 // 0: Easy, 1: Medium, 2: Hard
     });
     // Local ready state might drift from backend, rely on props?
@@ -128,8 +127,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                     {/* Toggles */}
                     <div style={{ display: 'flex', gap: '20px', marginBottom: '40px', zIndex: 1 }}>
                         {[
-                            { key: 'quickChat', label: 'QUICK CHAT' },
-                            { key: 'powerUps', label: 'POWER-UPS' }
+                            { key: 'quickChat', label: 'QUICK CHAT' }
                         ].map(({ key, label }) => (
                             <div
                                 key={key}

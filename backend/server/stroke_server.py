@@ -200,14 +200,14 @@ def process_message(room_id, message, sender_conn):
                 # System Message
                 sys_msg = json.dumps({
                     Protocol.ACTION: Protocol.CHAT,
-                    Protocol.PAYLOAD: f"SYSTEM: {player_name} guessed the word! (+10 pts)"
+                    Protocol.PAYLOAD: f"SYSTEM: {player_name} guessed the word! (+100 pts)"
                 })
                 broadcast(room_id, sys_msg)
             elif result == "round_over":
                  # 1. Announce last guess
                 sys_msg = json.dumps({
                     Protocol.ACTION: Protocol.CHAT,
-                    Protocol.PAYLOAD: f"SYSTEM: {player_name} guessed the word! (+10 pts)"
+                    Protocol.PAYLOAD: f"SYSTEM: {player_name} guessed the word! (+100 pts)"
                 })
                 broadcast(room_id, sys_msg)
                 

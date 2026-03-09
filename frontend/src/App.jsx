@@ -10,6 +10,7 @@ import Footer from './components/Footer'
 import Game from './Game'
 import Lobby from './Lobby'
 import JoinRoom from './components/JoinRoom'
+import Settings from './components/Settings'
 import { checkRoom, createRoom } from './api';
 import SoundManager from './utils/SoundManager'; // Import SoundManager
 
@@ -26,7 +27,7 @@ function App() {
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join' | 'game'
+  const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join' | 'game' | 'settings'
   const [nickname, setNickname] = useState('');
   const [roomId, setRoomId] = useState('room1'); // Default
   const [isHost, setIsHost] = useState(false);
@@ -112,7 +113,9 @@ function App() {
             V.1
           </div>
 
-          {view === 'landing' ? (
+          {view === 'settings' ? (
+            <Settings onBack={() => setView('landing')} />
+          ) : view === 'landing' ? (
             <>
               <AvatarSelector selected={selectedAvatar} onSelect={setSelectedAvatar} />
               <NicknameInput value={nickname} onChange={(val) => { setNickname(val); setNicknameError(''); }} />
@@ -168,7 +171,7 @@ function App() {
 
         </div>
 
-        <Footer />
+        <Footer onSettings={() => setView('settings')} />
       </div >
     </>
   )
