@@ -400,6 +400,10 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
                         onSelectTool={(t) => {
                             if (t === 'undo') {
                                 handleUndo();
+                            } else if (t === 'clear') {
+                                // Clear the entire canvas
+                                setNewStrokes([{ action: 'clear' }]);
+                                handleSendStroke({ action: 'clear', mode: 'mouse' });
                             } else {
                                 setSelectedTool(t);
                             }

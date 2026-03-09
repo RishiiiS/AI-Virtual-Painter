@@ -1,11 +1,12 @@
 import React from 'react';
-import { Paintbrush, Eraser, PaintBucket, Undo2 } from 'lucide-react';
+import { Paintbrush, Eraser, PaintBucket, Undo2, Trash2 } from 'lucide-react';
 
 const TOOLS = [
     { id: 'brush', icon: <Paintbrush size={28} strokeWidth={2.5} /> },
     { id: 'eraser', icon: <Eraser size={28} strokeWidth={2.5} /> },
     { id: 'fill', icon: <PaintBucket size={28} strokeWidth={2.5} /> },
     { id: 'undo', icon: <Undo2 size={28} strokeWidth={2.5} /> },
+    { id: 'clear', icon: <Trash2 size={28} strokeWidth={2.5} /> },
 ];
 
 const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize }) => {
