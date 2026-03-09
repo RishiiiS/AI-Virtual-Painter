@@ -77,6 +77,14 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
                 continue;
             }
 
+            if (stroke.action === 'fill' && stroke.x !== undefined && stroke.y !== undefined) {
+                // Flood fill at the normalized coordinates
+                const fx = stroke.x * canvas.width;
+                const fy = stroke.y * canvas.height;
+                floodFill(canvas, fx, fy, stroke.color);
+                continue;
+            }
+
             // Stroke format from backend: {x1, y1, x2, y2, color, thickness, mode}
             if (stroke.x1 !== undefined && stroke.y1 !== undefined && stroke.x2 !== undefined && stroke.y2 !== undefined) {
                 const strokeColor = normalizeColor(stroke.color);
@@ -215,14 +223,14 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
     }, [gestureState, drawMode, color, brushSize, tool]);
 
     const handleMouseDown = useCallback((e) => {
-        if (!isDrawer || drawMode === 'gesture') return;
+        if (!isDrawer || drawMode === 'gesture' || tool === 'fill') return;
         isDrawing.current = true;
         const point = getCanvasPoint(e);
         lastPoint.current = point;
-    }, [isDrawer, drawMode, getCanvasPoint]);
+    }, [isDrawer, drawMode, tool, getCanvasPoint]);
 
     const handleMouseMove = useCallback((e) => {
-        if (!isDrawer || drawMode === 'gesture' || !isDrawing.current || !lastPoint.current) return;
+        if (!isDrawer || drawMode === 'gesture' || tool === 'fill' || !isDrawing.current || !lastPoint.current) return;
 
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
@@ -258,25 +266,119 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
         }
 
         lastPoint.current = point;
-    }, [isDrawer, drawMode, color, tool, brushSize, getCanvasPoint, onSendStroke]);
+    }, [isDrawer, drawMode, tool, color, brushSize, getCanvasPoint, onSendStroke]);
 
     const handleMouseUp = useCallback(() => {
         isDrawing.current = false;
         lastPoint.current = null;
+    }, [tool]);
+
+    // Flood fill algorithm (scanline)
+    const floodFill = useCallback((canvas, startX, startY, fillColor) => {
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        const imageData = ctx.getImageData(0, 0, width, height);
+        const data = imageData.data;
+
+        // Convert CSS color to RGBA
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = 1;
+        tempCanvas.height = 1;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.fillStyle = fillColor;
+        tempCtx.fillRect(0, 0, 1, 1);
+        const fillRGBA = tempCtx.getImageData(0, 0, 1, 1).data;
+
+        // Get the color at the starting pixel
+        const sx = Math.floor(startX);
+        const sy = Math.floor(startY);
+        if (sx < 0 || sx >= width || sy < 0 || sy >= height) return;
+
+        const startIdx = (sy * width + sx) * 4;
+        const targetR = data[startIdx];
+        const targetG = data[startIdx + 1];
+        const targetB = data[startIdx + 2];
+        const targetA = data[startIdx + 3];
+
+        // Don't fill if clicking on the same color
+        if (targetR === fillRGBA[0] && targetG === fillRGBA[1] && targetB === fillRGBA[2] && targetA === fillRGBA[3]) return;
+
+        const colorMatch = (idx) => {
+            const tolerance = 15;
+            return Math.abs(data[idx] - targetR) <= tolerance &&
+                Math.abs(data[idx + 1] - targetG) <= tolerance &&
+                Math.abs(data[idx + 2] - targetB) <= tolerance &&
+                Math.abs(data[idx + 3] - targetA) <= tolerance;
+        };
+
+        const setPixel = (idx) => {
+            data[idx] = fillRGBA[0];
+            data[idx + 1] = fillRGBA[1];
+            data[idx + 2] = fillRGBA[2];
+            data[idx + 3] = fillRGBA[3];
+        };
+
+        // Scanline flood fill using a stack
+        const stack = [[sx, sy]];
+        const visited = new Uint8Array(width * height);
+
+        while (stack.length > 0) {
+            const [x, y] = stack.pop();
+            if (x < 0 || x >= width || y < 0 || y >= height) continue;
+            const pixelPos = y * width + x;
+            if (visited[pixelPos]) continue;
+
+            const idx = pixelPos * 4;
+            if (!colorMatch(idx)) continue;
+
+            // Scan left
+            let left = x;
+            while (left > 0 && colorMatch(((y * width) + (left - 1)) * 4) && !visited[y * width + (left - 1)]) {
+                left--;
+            }
+
+            // Scan right
+            let right = x;
+            while (right < width - 1 && colorMatch(((y * width) + (right + 1)) * 4) && !visited[y * width + (right + 1)]) {
+                right++;
+            }
+
+            // Fill the span and check above/below
+            for (let px = left; px <= right; px++) {
+                const pIdx = (y * width + px) * 4;
+                setPixel(pIdx);
+                visited[y * width + px] = 1;
+
+                if (y > 0 && !visited[(y - 1) * width + px] && colorMatch(((y - 1) * width + px) * 4)) {
+                    stack.push([px, y - 1]);
+                }
+                if (y < height - 1 && !visited[(y + 1) * width + px] && colorMatch(((y + 1) * width + px) * 4)) {
+                    stack.push([px, y + 1]);
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
     }, []);
 
-    // Fill tool
+    // Fill tool click handler
     const handleClick = useCallback((e) => {
         if (!isDrawer || drawMode === 'gesture' || tool !== 'fill') return;
         const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = color;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+
+        floodFill(canvas, x, y, color);
 
         if (onSendStroke) {
-            onSendStroke({ action: 'fill', color, mode: 'mouse' });
+            // Send normalized coordinates (0-1 range) so receiver can scale
+            onSendStroke({ action: 'fill', color, x: x / canvas.width, y: y / canvas.height, mode: 'mouse' });
         }
-    }, [isDrawer, drawMode, tool, color, onSendStroke]);
+    }, [isDrawer, drawMode, tool, color, onSendStroke, floodFill]);
 
     return (
         <div style={{
