@@ -2,12 +2,14 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import useHandTracking from '../hooks/useHandTracking';
 import { Hand, Mouse, Video } from 'lucide-react';
 
-const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId, playerName, onSendStroke, strokesFromServer, drawMode, localStream }) => {
+const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId, playerName, onSendStroke, strokesFromServer, drawMode, localStream, onUndoRef }) => {
     const canvasRef = useRef(null);
     const videoRef = useRef(null);
     const isDrawing = useRef(false);
     const lastPoint = useRef(null);
     const gestureOverlayRef = useRef(null);
+    const undoStack = useRef([]);
+    const MAX_UNDO = 30;
 
     // Ref to hold callback for immediate gesture stroke processing
     // (useEffect + state dependency can miss rapid updates due to React batching)
@@ -49,6 +51,8 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
         const ctx = canvas.getContext('2d');
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        // Save initial blank canvas as first undo state
+        undoStack.current = [ctx.getImageData(0, 0, canvas.width, canvas.height)];
     }, []);
 
     // Convert color from any format to a valid CSS color string
@@ -269,6 +273,18 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
     }, [isDrawer, drawMode, tool, color, brushSize, getCanvasPoint, onSendStroke]);
 
     const handleMouseUp = useCallback(() => {
+        if (isDrawing.current) {
+            // Save canvas snapshot for undo
+            const canvas = canvasRef.current;
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                undoStack.current.push(snapshot);
+                if (undoStack.current.length > MAX_UNDO) {
+                    undoStack.current.shift();
+                }
+            }
+        }
         isDrawing.current = false;
         lastPoint.current = null;
     }, [tool]);
@@ -374,11 +390,34 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
 
         floodFill(canvas, x, y, color);
 
+        // Save snapshot after fill for undo
+        const ctx = canvas.getContext('2d');
+        const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        undoStack.current.push(snapshot);
+        if (undoStack.current.length > MAX_UNDO) undoStack.current.shift();
+
         if (onSendStroke) {
             // Send normalized coordinates (0-1 range) so receiver can scale
             onSendStroke({ action: 'fill', color, x: x / canvas.width, y: y / canvas.height, mode: 'mouse' });
         }
     }, [isDrawer, drawMode, tool, color, onSendStroke, floodFill]);
+
+    // Expose undo function via ref
+    useEffect(() => {
+        if (onUndoRef) {
+            onUndoRef.current = () => {
+                if (undoStack.current.length > 1) {
+                    undoStack.current.pop(); // Remove current state
+                    const prevState = undoStack.current[undoStack.current.length - 1];
+                    const canvas = canvasRef.current;
+                    if (canvas && prevState) {
+                        const ctx = canvas.getContext('2d');
+                        ctx.putImageData(prevState, 0, 0);
+                    }
+                }
+            };
+        }
+    }, [onUndoRef]);
 
     return (
         <div style={{

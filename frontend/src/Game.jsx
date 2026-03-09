@@ -26,6 +26,7 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
     const joinedRef = useRef(false);
     const prevRoundActiveRef = useRef(false);
     const prevDrawerRef = useRef(null);
+    const undoRef = useRef(null);
 
     // WebRTC refs
     const peerConnectionsRef = useRef(new Map()); // guesserSid → RTCPeerConnection
@@ -321,12 +322,8 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
     }, [isDrawer]);
 
     const handleUndo = useCallback(() => {
-        // Simple undo: clear canvas (could be improved with stroke stack)
-        const canvas = document.querySelector('canvas');
-        if (canvas) {
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'white';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        if (undoRef.current) {
+            undoRef.current();
         }
     }, []);
 
@@ -436,6 +433,7 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
                         strokesFromServer={newStrokes}
                         drawMode={drawMode}
                         localStream={localStreamRef.current}
+                        onUndoRef={undoRef}
                     />
 
                     {/* Palette (Only if Drawer) */}
