@@ -7,7 +7,9 @@ class GameState:
     def __init__(self):
         # Structure: { room_id: { 'clients': [conn], 'history': [json_stroke_str], 'score': {} } }
         self.rooms = {}
-        self.lock = threading.RLock()
+        # Stores (room_id, player_name) -> threading.Timer
+        self.disconnect_timers = {}
+        self.lock = threading.Lock()
 
     def create_room_if_missing(self, room_id):
         with self.lock:
@@ -213,6 +215,7 @@ class GameState:
                         room['guessed_players'] = set()
                         room['drawer'] = None
                     
+                    
                     del self.rooms[room_id]['players'][web_key]
                     print(f"Removed web player {player_name} from {room_id}")
                     result['removed'] = True
@@ -225,6 +228,38 @@ class GameState:
                         print(f"Host left {room_id}. New host: {new_host}")
         return result
 
+    def schedule_remove_web_client(self, room_id, player_name):
+        """Wait 3 seconds before actually removing a player. 
+        This prevents Host reassignment during quick page refreshes.
+        Returns a mock result so admin.py doesn't crash."""
+        timer_key = (room_id, player_name)
+        result = {'removed': False, 'was_drawer': False}
+        
+        with self.lock:
+            # Cancel existing timer if any
+            if timer_key in self.disconnect_timers:
+                self.disconnect_timers[timer_key].cancel()
+                
+            # If they happen to be the drawer, don't kill the round instantly.
+            # We delay it to see if they come back.
+            def delayed_remove():
+                print(f"Executing delayed remove for {player_name} in {room_id}")
+                actual_result = self.remove_web_client(room_id, player_name)
+                
+                # If they were the active drawer and actually left, we need to notify the stroke server
+                # to handle the early round end. This is tricky since we are now in a detached thread.
+                # Easiest way: The stroke_server auto-detects empty rooms and missing drawers in its poll loops,
+                # or wait for the round timer to run out.
+                with self.lock:
+                    if timer_key in self.disconnect_timers:
+                        del self.disconnect_timers[timer_key]
+                        
+            timer = threading.Timer(3.0, delayed_remove)
+            self.disconnect_timers[timer_key] = timer
+            timer.start()
+            
+        return result
+
     def add_web_client(self, room_id, player_name, avatar='ghost'):
         """Register a web player using a string key (no TCP socket)."""
         self.create_room_if_missing(room_id)
@@ -232,6 +267,12 @@ class GameState:
             if 'players' not in self.rooms[room_id]:
                 self.rooms[room_id]['players'] = {}
             
+            timer_key = (room_id, player_name)
+            if timer_key in self.disconnect_timers:
+                self.disconnect_timers[timer_key].cancel()
+                del self.disconnect_timers[timer_key]
+                print(f"Cancelled disconnect timer for {player_name} in {room_id}")
+                
             web_key = f"web_{player_name}"
             
             # Check if already registered

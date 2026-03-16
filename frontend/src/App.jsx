@@ -16,6 +16,8 @@ import { checkRoom, createRoom } from './api';
 import SoundManager from './utils/SoundManager'; // Import SoundManager
 
 function App() {
+  const [isInitializing, setIsInitializing] = useState(true);
+
   // Global click sound
   React.useEffect(() => {
     const handleGlobalClick = (e) => {
@@ -42,7 +44,43 @@ function App() {
     sessionStorage.setItem('dd_avatar', String(selectedAvatar));
   }, [view, nickname, roomId, isHost, selectedAvatar]);
 
+  // Handle reload routing: force user back to 'game' or 'lobby' depending on backend state
+  React.useEffect(() => {
+    const verifyState = async () => {
+      if ((view === 'lobby' || view === 'game') && roomId) {
+        try {
+          const res = await checkRoom(roomId);
+          if (res && res.exists) {
+            // If backend says round is active, force 'game' view
+            if (res.round_active) {
+              setView('game');
+            }
+            // If backend says round isn't active but we were in 'game', force 'lobby'
+            else if (view === 'game') {
+              setView('lobby');
+            }
+          } else {
+            // Room doesn't exist anymore, reset
+            setView('landing');
+          }
+        } catch (e) {
+          console.error("Failed to verify room state on load", e);
+        }
+      }
+      setIsInitializing(false);
+    };
+    verifyState();
+  }, [roomId]);
+
   const [nicknameError, setNicknameError] = useState('');
+
+  if (isInitializing) {
+    return <div style={{
+      backgroundColor: '#F7EDE2', height: '100vh', display: 'flex',
+      alignItems: 'center', justifyContent: 'center',
+      fontFamily: '"Titan One", sans-serif', color: '#333'
+    }}>LOADING...</div>;
+  }
 
   if (view === 'game') {
     return (

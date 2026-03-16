@@ -534,7 +534,7 @@ def leave_room():
     if not room_id or not player_name:
         return jsonify({"error": "Missing room_id or player_name"}), 400
     
-    result = game_state_ref.remove_web_client(room_id, player_name)
+    result = game_state_ref.schedule_remove_web_client(room_id, player_name)
     
     # If the drawer left mid-round, immediately start a new round with remaining players
     if result.get('was_drawer') and stroke_server_module:
