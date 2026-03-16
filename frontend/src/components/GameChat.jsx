@@ -122,7 +122,9 @@ const GameChat = ({ messages = [], onSendMessage, currentUser }) => {
             <div style={{
                 padding: '10px',
                 borderTop: '3px solid #333',
-                backgroundColor: '#eee'
+                backgroundColor: '#eee',
+                display: 'flex',
+                gap: '8px'
             }}>
                 <input
                     type="text"
@@ -131,7 +133,7 @@ const GameChat = ({ messages = [], onSendMessage, currentUser }) => {
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyDown={handleKeyDown}
                     style={{
-                        width: '100%',
+                        flex: 1,
                         padding: '10px',
                         border: '3px solid #333',
                         fontFamily: '"Fredoka", sans-serif',
@@ -141,6 +143,25 @@ const GameChat = ({ messages = [], onSendMessage, currentUser }) => {
                         textTransform: 'uppercase'
                     }}
                 />
+                <button
+                    onClick={handleSend}
+                    className="btn-sound"
+                    style={{
+                        padding: '0 15px',
+                        backgroundColor: '#EBC334',
+                        color: '#333',
+                        border: '3px solid #333',
+                        fontFamily: '"Titan One", sans-serif',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        boxShadow: '3px 3px 0 #333',
+                        transition: 'transform 0.1s'
+                    }}
+                    onMouseDown={(e) => e.target.style.transform = 'translate(2px, 2px)'}
+                    onMouseUp={(e) => e.target.style.transform = 'translate(0, 0)'}
+                >
+                    SEND
+                </button>
             </div>
         </div>
     );

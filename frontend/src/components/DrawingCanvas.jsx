@@ -419,6 +419,9 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
         }
     }, [onUndoRef]);
 
+    const paintBucketCursor = `url('data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m19%2011-8-8-8.6%208.6a2%202%200%200%200%200%202.8l5.2%205.2c.8.8%202%20.8%202.8%200L19%2011Z%22%2F%3E%3Cpath%20d%3D%22m5%202%205%205%22%2F%3E%3Cpath%20d%3D%22M2%2013h15%22%2F%3E%3Cpath%20d%3D%22m22%2020-1.5-1.5%22%2F%3E%3Cpath%20d%3D%22m22%2016-1.5%201.5%22%2F%3E%3Cpath%20d%3D%22m18%2020%201.5-1.5%22%2F%3E%3C%2Fsvg%3E') 0 24, crosshair`;
+    const eraserCursor = `url('data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m7%2021-4.3-4.3c-1-1-1-2.5%200-3.4l9.6-9.6c1-1%202.5-1%203.4%200l5.6%205.6c1%201%201%202.5%200%203.4L13%2021%22%2F%3E%3Cpath%20d%3D%22M22%2021H7%22%2F%3E%3Cpath%20d%3D%22m5%2011%209%209%22%2F%3E%3C%2Fsvg%3E') 0 24, cell`;
+
     return (
         <div style={{
             flex: 1,
@@ -437,7 +440,7 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
                     height: '100%',
                     display: 'block',
                     cursor: isDrawer
-                        ? (drawMode === 'gesture' ? 'none' : (tool === 'eraser' ? 'cell' : 'crosshair'))
+                        ? (drawMode === 'gesture' ? 'none' : (tool === 'eraser' ? eraserCursor : tool === 'fill' ? paintBucketCursor : 'crosshair'))
                         : 'default'
                 }}
                 onMouseDown={handleMouseDown}
