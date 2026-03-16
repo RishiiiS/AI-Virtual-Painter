@@ -345,7 +345,26 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
         }
     }, []);
 
-    if (!gameState) return <div style={{ fontFamily: '"Titan One"', color: 'white', textAlign: 'center', marginTop: '20%' }}>LOADING GAME...</div>;
+    if (!gameState) return (
+        <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100vh',
+            width: '100vw',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            fontFamily: '"Titan One", sans-serif',
+            color: 'white',
+            fontSize: '2rem',
+            letterSpacing: '2px',
+            textShadow: '2px 2px 0 rgba(0,0,0,0.1)',
+            zIndex: 9999
+        }}>
+            LOADING GAME...
+        </div>
+    );
 
     // Transform players for PlayerList
     const displayPlayers = (gameState.players || []).map(p => ({

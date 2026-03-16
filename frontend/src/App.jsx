@@ -11,6 +11,7 @@ import Game from './Game'
 import Lobby from './Lobby'
 import JoinRoom from './components/JoinRoom'
 import Settings from './components/Settings'
+import HowToPlay from './components/HowToPlay'
 import { checkRoom, createRoom } from './api';
 import SoundManager from './utils/SoundManager'; // Import SoundManager
 
@@ -27,11 +28,19 @@ function App() {
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  const [view, setView] = useState('landing'); // 'landing' | 'lobby' | 'join' | 'game' | 'settings'
-  const [nickname, setNickname] = useState('');
-  const [roomId, setRoomId] = useState('room1'); // Default
-  const [isHost, setIsHost] = useState(false);
-  const [selectedAvatar, setSelectedAvatar] = useState(1);
+  const [view, setView] = useState(() => sessionStorage.getItem('dd_view') || 'landing'); // 'landing' | 'lobby' | 'join' | 'game' | 'settings' | 'howtoplay'
+  const [nickname, setNickname] = useState(() => sessionStorage.getItem('dd_nickname') || '');
+  const [roomId, setRoomId] = useState(() => sessionStorage.getItem('dd_roomId') || 'room1');
+  const [isHost, setIsHost] = useState(() => sessionStorage.getItem('dd_isHost') === 'true');
+  const [selectedAvatar, setSelectedAvatar] = useState(() => parseInt(sessionStorage.getItem('dd_avatar')) || 1);
+
+  React.useEffect(() => {
+    sessionStorage.setItem('dd_view', view);
+    sessionStorage.setItem('dd_nickname', nickname);
+    sessionStorage.setItem('dd_roomId', roomId);
+    sessionStorage.setItem('dd_isHost', String(isHost));
+    sessionStorage.setItem('dd_avatar', String(selectedAvatar));
+  }, [view, nickname, roomId, isHost, selectedAvatar]);
 
   const [nicknameError, setNicknameError] = useState('');
 
@@ -115,6 +124,8 @@ function App() {
 
           {view === 'settings' ? (
             <Settings onBack={() => setView('landing')} />
+          ) : view === 'howtoplay' ? (
+            <HowToPlay onBack={() => setView('landing')} />
           ) : view === 'landing' ? (
             <>
               <AvatarSelector selected={selectedAvatar} onSelect={setSelectedAvatar} />
@@ -171,7 +182,7 @@ function App() {
 
         </div>
 
-        <Footer onSettings={() => setView('settings')} />
+        <Footer onSettings={() => setView('settings')} onHowToPlay={() => setView('howtoplay')} />
       </div >
     </>
   )

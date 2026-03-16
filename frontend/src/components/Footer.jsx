@@ -1,6 +1,6 @@
 import React from 'react';
 
-const Footer = ({ onSettings }) => {
+const Footer = ({ onSettings, onHowToPlay }) => {
     return (
         <div style={{
             marginTop: '50px',
@@ -12,7 +12,10 @@ const Footer = ({ onSettings }) => {
             color: '#555',
             letterSpacing: '1px'
         }}>
-            <a href="#" style={{ color: '#333', textDecoration: 'none', borderBottom: '3px solid #EBC334' }}>HOW TO PLAY</a>
+            <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); onHowToPlay && onHowToPlay(); }}
+                style={{ color: '#333', textDecoration: 'none', borderBottom: '3px solid #EBC334' }}>HOW TO PLAY</a>
             <a
                 href="#"
                 onClick={(e) => { e.preventDefault(); onSettings && onSettings(); }}
