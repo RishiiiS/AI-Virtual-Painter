@@ -20,8 +20,8 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
     const guests = players.filter(p => !p.isHost);
     const allGuestsReady = guests.length > 0 && guests.every(p => p.status === 'READY');
 
-    // Host can start if: at least 1 guest, and ALL guests are ready.
-    const canStart = isHost && guests.length >= 1 && allGuestsReady;
+    // Host can start if ALL guests are ready. If there are no guests, host can start for solo testing.
+    const canStart = isHost && (guests.length === 0 || allGuestsReady);
 
     const toggleSetting = (key) => {
         setSettings(prev => ({ ...prev, [key]: !prev[key] }));
@@ -201,11 +201,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                         if (canStart) {
                             onStartGame(duration);
                         } else {
-                            if (guests.length === 0) {
-                                alert("Need at least 2 players!");
-                            } else {
-                                alert("Wait for all players to be READY!");
-                            }
+                            alert("Wait for all players to be READY!");
                         }
                     } else {
                         const newState = !isReady;
@@ -218,7 +214,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
             </button>
 
             <div style={{ textAlign: 'center', fontFamily: '"Fredoka", sans-serif', color: '#666', fontSize: '0.8rem', letterSpacing: '2px', fontWeight: 'bold' }}>
-                {isHost ? (guests.length === 0 ? "WAITING FOR PLAYERS..." : (canStart ? "READY TO START!" : "WAITING FOR OTHERS TO BE READY...")) : "ARE YOU READY?"}
+                {isHost ? (canStart ? "READY TO START!" : "WAITING FOR OTHERS TO BE READY...") : "ARE YOU READY?"}
             </div>
 
         </div>

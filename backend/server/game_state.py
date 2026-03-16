@@ -345,40 +345,38 @@ class GameState:
             if room_id in self.rooms and 'players' in self.rooms[room_id]:
                 room = self.rooms[room_id]
                 
-                # Check Queue
-                if not room.get('drawer_queue'):
-                    # Refill Queue (Round Robin)
-                    # We use insertion order from players dict values
-                    current_player_names = []
-                    seen = set()
-                    for p in room['players'].values():
-                        name = p['name']
-                        if name not in seen:
-                            current_player_names.append(name)
-                            seen.add(name)
+                # We may need to refill the queue more than once if all players in it left
+                for _ in range(2): 
+                    # Check Queue
+                    if not room.get('drawer_queue'):
+                        # Refill Queue (Round Robin)
+                        current_player_names = []
+                        seen = set()
+                        for p in room['players'].values():
+                            name = p['name']
+                            if name not in seen:
+                                current_player_names.append(name)
+                                seen.add(name)
+                                
+                        if not current_player_names:
+                            return None
                             
-                    if not current_player_names:
-                        return None
+                        room['drawer_queue'] = list(current_player_names)
+                        print(f"Refilled drawer queue for {room_id}: {room['drawer_queue']}")
                         
-                    room['drawer_queue'] = list(current_player_names)
-                    print(f"Refilled drawer queue for {room_id}: {room['drawer_queue']}")
-                    
-                # Pop next
-                # Validate player is still here
-                while room['drawer_queue']:
-                    next_drawer = room['drawer_queue'].pop(0)
-                    # Check if this player is still in room
-                    player_exists = False
-                    for p in room['players'].values():
-                        if p['name'] == next_drawer:
-                            player_exists = True
-                            break
-                    
-                    if player_exists:
-                         room['drawer'] = next_drawer
-                         return next_drawer
+                    # Pop next and Validate
+                    while room['drawer_queue']:
+                        next_drawer = room['drawer_queue'].pop(0)
+                        player_exists = False
+                        for p in room['players'].values():
+                            if p['name'] == next_drawer:
+                                player_exists = True
+                                break
+                        
+                        if player_exists:
+                             room['drawer'] = next_drawer
+                             return next_drawer
                 
-                # If list exhausted (all left), fallback
                 return None
         return None
         

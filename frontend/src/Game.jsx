@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameHeader from './components/GameHeader';
 import Toolbar from './components/Toolbar';
 import DrawingCanvas from './components/DrawingCanvas';
+import AvatarIcon from './components/AvatarIcon';
 import Palette from './components/Palette';
 import GameChat from './components/GameChat';
 import PlayerList from './components/PlayerList';
 import ResultPage from './components/ResultPage';
-import { getState, sendChat, joinRoom, leaveRoom, sendStroke, getStrokes } from './api';
+import { getState, sendChat, joinRoom, leaveRoom, sendStroke, getStrokes, endRoom } from './api';
 import { joinSignalingRoom, sendOffer, sendAnswer, sendIceCandidate, onNewGuesser, onOffer, onAnswer, onIceCandidate, disconnectSignaling } from './signaling';
 
 import SoundManager from './utils/SoundManager'; // Import SoundManager
@@ -257,10 +258,12 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
     }, [isDrawer, roomId]);
 
     // Poll game state
+    const hasReceivedStateRef = useRef(false);
     useEffect(() => {
         const interval = setInterval(async () => {
             const state = await getState();
             if (state && state[roomId]) {
+                hasReceivedStateRef.current = true;
                 const roomData = state[roomId];
                 setGameState(roomData);
 
@@ -278,10 +281,13 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
 
                 prevRoundActiveRef.current = roomData.round_active;
                 prevDrawerRef.current = roomData.drawer;
+            } else if (hasReceivedStateRef.current) {
+                // Room was deleted or we were kicked (only after we've seen it at least once)
+                onEndGame();
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [roomId, playerName]);
+    }, [roomId, playerName, onEndGame]);
 
     // Poll strokes (for guessers to see what's being drawn)
     useEffect(() => {
@@ -298,6 +304,18 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
 
     const handleSendMessage = (msg) => {
         sendChat(roomId, msg, playerName);
+    };
+
+    const handleLeaveGame = async () => {
+        await leaveRoom(roomId, playerName);
+        onEndGame(); // Redirect to landing
+    };
+
+    const handleEndGameAll = async () => {
+        if (isHost) {
+            await endRoom(roomId, playerName);
+            onEndGame(); // Redirect to landing
+        }
     };
 
     const handleSendStroke = useCallback((stroke) => {
@@ -387,8 +405,6 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
                     flexDirection: 'column',
                     justifyContent: 'center',
                     gap: '20px',
-                    pointerEvents: isDrawer ? 'auto' : 'none',
-                    opacity: isDrawer ? 1 : 0.5,
                     width: '80px',
                     flexShrink: 0
                 }}>
@@ -407,6 +423,11 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
                         }}
                         brushSize={brushSize}
                         onSelectSize={setBrushSize}
+                        inGame={true}
+                        isHost={isHost}
+                        isDrawer={isDrawer}
+                        onLeaveGame={handleLeaveGame}
+                        onEndGameAll={handleEndGameAll}
                     />
                 </div>
 

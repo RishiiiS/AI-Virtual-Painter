@@ -477,6 +477,49 @@ def join_room():
                 is_host = p['is_host']
     
     return jsonify({"status": "joined", "web_key": web_key, "is_host": is_host})
+@app.route('/api/end_room', methods=['POST'])
+def end_room():
+    """Host manually ends the game for everyone."""
+    if not game_state_ref:
+        return jsonify({"error": "Game state not linked"}), 500
+    
+    data = request.json
+    room_id = data.get('room_id')
+    player_name = data.get('player_name')
+    
+    if not room_id or not player_name:
+        return jsonify({"error": "Missing room_id or player_name"}), 400
+        
+    with game_state_ref.lock:
+        if room_id in game_state_ref.rooms:
+            room = game_state_ref.rooms[room_id]
+            # Verify host
+            is_host = False
+            for pdata in room['players'].values():
+                if pdata['name'] == player_name and pdata['is_host']:
+                    is_host = True
+                    break
+                    
+            if is_host:
+                # Cancel any running timers
+                game_state_ref.cancel_timer(room_id)
+                
+                # Close all connections gracefully
+                conns_to_close = list(room['players'].keys())
+                for conn in conns_to_close:
+                    try:
+                        conn.close()
+                    except:
+                        pass
+                
+                # Delete the room
+                del game_state_ref.rooms[room_id]
+                return jsonify({"status": "success"})
+            else:
+                return jsonify({"error": "Only the host can end the game"}), 403
+        else:
+            return jsonify({"error": "Room not found"}), 404
+            
 
 @app.route('/api/leave_room', methods=['POST'])
 def leave_room():

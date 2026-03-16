@@ -159,3 +159,15 @@ export const leaveRoom = async (roomId, playerName) => {
         // Silent — we're leaving anyway
     }
 };
+
+export const endRoom = async (roomId, playerName) => {
+    try {
+        await fetch(`${API_URL}/end_room`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId, player_name: playerName })
+        });
+    } catch (e) {
+        console.error("End room error:", e);
+    }
+};

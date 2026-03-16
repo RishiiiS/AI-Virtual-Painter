@@ -296,6 +296,11 @@ def handle_start_game(room_id, sender_conn=None, duration=60):
         print(f"Ignored start_game in {room_id} (already active)")
         return
 
+    # Ensure there are enough players to start (prevents zombie auto-starters)
+    if len(game_state.rooms.get(room_id, {}).get('players', {})) < 1:
+        print(f"Aborted start_game in {room_id} (no players left)")
+        return
+
     # Check Ready Status (only for manual start, not system/timer auto-start)
     if sender_conn is not None and not game_state.are_all_players_ready(room_id):
         print(f"Ignored start_game in {room_id} (not all players ready)")

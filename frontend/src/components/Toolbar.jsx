@@ -10,7 +10,7 @@ const TOOLS = [
     { id: 'clear', icon: <Trash2 size={28} strokeWidth={2.5} /> },
 ];
 
-const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize }) => {
+const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize, inGame, isHost, isDrawer, onLeaveGame, onEndGameAll }) => {
     const [showSettings, setShowSettings] = useState(false);
 
     return (
@@ -20,65 +20,74 @@ const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize }) => {
                 flexDirection: 'column',
                 gap: '15px'
             }}>
-                {TOOLS.map((tool) => (
-                    <button
-                        key={tool.id}
-                        onClick={() => onSelectTool(tool.id)}
-                        style={{
-                            width: '60px',
-                            height: '60px',
-                            backgroundColor: selectedTool === tool.id ? '#EBC334' : 'white',
-                            border: '3px solid #333',
-                            fontSize: '1.5rem',
-                            cursor: 'pointer',
-                            boxShadow: selectedTool === tool.id ? '2px 2px 0 #333' : '4px 4px 0 rgba(0,0,0,0.2)',
-                            transform: selectedTool === tool.id ? 'translate(2px, 2px)' : 'none',
-                            transition: 'all 0.1s',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                        }}
-                    >
-                        {tool.icon}
-                    </button>
-                ))}
-
-                {/* Brush Size Selector */}
+                {/* Tools locked for non-drawers */}
                 <div style={{
-                    width: '60px',
-                    backgroundColor: 'white',
-                    border: '3px solid #333',
-                    boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '10px 0',
-                    gap: '12px'
+                    gap: '15px',
+                    pointerEvents: isDrawer ? 'auto' : 'none',
+                    opacity: isDrawer ? 1 : 0.5,
                 }}>
-                    {[5, 10, 20].map((size) => (
-                        <div
-                            key={size}
-                            onClick={() => onSelectSize && onSelectSize(size)}
+                    {TOOLS.map((tool) => (
+                        <button
+                            key={tool.id}
+                            onClick={() => onSelectTool(tool.id)}
                             style={{
-                                width: '36px',
-                                height: '36px',
+                                width: '60px',
+                                height: '60px',
+                                backgroundColor: selectedTool === tool.id ? '#EBC334' : 'white',
+                                border: '3px solid #333',
+                                fontSize: '1.5rem',
+                                cursor: 'pointer',
+                                boxShadow: selectedTool === tool.id ? '2px 2px 0 #333' : '4px 4px 0 rgba(0,0,0,0.2)',
+                                transform: selectedTool === tool.id ? 'translate(2px, 2px)' : 'none',
+                                transition: 'all 0.1s',
                                 display: 'flex',
                                 alignItems: 'center',
-                                justifyContent: 'center',
-                                cursor: 'pointer',
+                                justifyContent: 'center'
                             }}
                         >
-                            <div style={{
-                                width: `${size + 4}px`,
-                                height: `${size + 4}px`,
-                                borderRadius: '50%',
-                                backgroundColor: '#333',
-                                border: brushSize === size ? '3px solid #EBC334' : 'none',
-                                boxShadow: brushSize === size ? '0 0 0 2px #333' : 'none',
-                            }} />
-                        </div>
+                            {tool.icon}
+                        </button>
                     ))}
+
+                    {/* Brush Size Selector */}
+                    <div style={{
+                        width: '60px',
+                        backgroundColor: 'white',
+                        border: '3px solid #333',
+                        boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        padding: '10px 0',
+                        gap: '12px'
+                    }}>
+                        {[5, 10, 20].map((size) => (
+                            <div
+                                key={size}
+                                onClick={() => onSelectSize && onSelectSize(size)}
+                                style={{
+                                    width: '36px',
+                                    height: '36px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                <div style={{
+                                    width: `${size + 4}px`,
+                                    height: `${size + 4}px`,
+                                    borderRadius: '50%',
+                                    backgroundColor: '#333',
+                                    border: brushSize === size ? '3px solid #EBC334' : 'none',
+                                    boxShadow: brushSize === size ? '0 0 0 2px #333' : 'none',
+                                }} />
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Settings Button */}
@@ -130,7 +139,13 @@ const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize }) => {
                         border: '4px solid #333',
                         boxShadow: '8px 8px 0 rgba(0,0,0,0.8)',
                     }}>
-                        <Settings onBack={() => setShowSettings(false)} />
+                        <Settings
+                            onBack={() => setShowSettings(false)}
+                            inGame={inGame}
+                            isHost={isHost}
+                            onLeave={onLeaveGame}
+                            onEndGame={onEndGameAll}
+                        />
                     </div>
                 </div>
             )}

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Timer, Palette, ArrowLeft } from 'lucide-react';
 import SoundManager from '../utils/SoundManager';
 
-const Settings = ({ onBack }) => {
+const Settings = ({ onBack, inGame, isHost, onLeave, onEndGame }) => {
     const [soundEnabled, setSoundEnabled] = useState(true);
     const [clickVolume, setClickVolume] = useState(50);
     const [timerVolume, setTimerVolume] = useState(60);
@@ -164,6 +164,55 @@ const Settings = ({ onBack }) => {
                     </div>
                 </div>
             </div>
+
+            {/* Leave / End Game Buttons (Only when in game) */}
+            {inGame && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+                    <button
+                        className="btn-sound"
+                        onClick={onLeave}
+                        style={{
+                            width: '100%',
+                            padding: '14px',
+                            backgroundColor: '#D96C2C',
+                            color: 'white',
+                            border: '3px solid #333',
+                            fontFamily: '"Titan One", sans-serif',
+                            fontSize: '1.1rem',
+                            cursor: 'pointer',
+                            boxShadow: '4px 4px 0 #333',
+                            transition: 'transform 0.1s'
+                        }}
+                        onMouseDown={(e) => e.currentTarget.style.transform = 'translate(2px, 2px)'}
+                        onMouseUp={(e) => e.currentTarget.style.transform = 'translate(0, 0)'}
+                    >
+                        LEAVE GAME
+                    </button>
+
+                    {isHost && (
+                        <button
+                            className="btn-sound"
+                            onClick={onEndGame}
+                            style={{
+                                width: '100%',
+                                padding: '14px',
+                                backgroundColor: '#CC444B',
+                                color: 'white',
+                                border: '3px solid #333',
+                                fontFamily: '"Titan One", sans-serif',
+                                fontSize: '1.1rem',
+                                cursor: 'pointer',
+                                boxShadow: '4px 4px 0 #333',
+                                transition: 'transform 0.1s'
+                            }}
+                            onMouseDown={(e) => e.currentTarget.style.transform = 'translate(2px, 2px)'}
+                            onMouseUp={(e) => e.currentTarget.style.transform = 'translate(0, 0)'}
+                        >
+                            END GAME (EVERYONE)
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Back Button */}
             <button
