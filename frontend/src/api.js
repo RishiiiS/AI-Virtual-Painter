@@ -1,5 +1,4 @@
 const API_URL = 'http://localhost:5001/api';
-import { getSocket } from './signaling';
 
 export const getState = async () => {
     try {
@@ -15,16 +14,42 @@ export const getState = async () => {
 };
 
 export const sendChat = async (roomId, message, sender) => {
-    getSocket().emit('chat_message', { room_id: roomId, message, sender });
+    try {
+        await fetch(`${API_URL}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'send_chat',
+                room_id: roomId,
+                message: message,
+                sender: sender
+            })
+        });
+    } catch (e) {
+        console.error("Send chat error:", e);
+    }
 };
 
-export const startGame = (roomId, duration = 60) => {
+export const startGame = async (roomId, duration = 60) => {
     console.log("Found roomId for start:", roomId, "duration:", duration);
-    getSocket().emit('start_game', { room_id: roomId, duration });
+    try {
+        const res = await fetch(`${API_URL}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'start_game',
+                room_id: roomId,
+                duration: duration
+            })
+        });
+        const json = await res.json();
+        console.log("Start Game Response:", json);
+    } catch (e) {
+        console.error("Start game error:", e);
+    }
 };
 
 export const getVideoFrame = async (roomId) => {
-    // Legacy HTTP fetch, keep for now or remove if video is also WebRTC
     try {
         const res = await fetch(`${API_URL}/video/${roomId}`);
         if (!res.ok) return null;
@@ -46,7 +71,20 @@ export const checkRoom = async (roomId) => {
 };
 
 export const sendReady = async (roomId, isReady, playerName) => {
-    getSocket().emit('ready_up', { room_id: roomId, is_ready: isReady, sender: playerName });
+    try {
+        await fetch(`${API_URL}/action`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'ready_up',
+                room_id: roomId,
+                is_ready: isReady,
+                sender: playerName
+            })
+        });
+    } catch (e) {
+        console.error("Send ready error:", e);
+    }
 };
 
 export const createRoom = async () => {
@@ -75,12 +113,38 @@ export const joinRoom = async (roomId, playerName, avatar = 'star') => {
     }
 };
 
-export const sendStroke = (roomId, playerName, stroke) => {
-    getSocket().emit('draw_stroke', { room_id: roomId, player_name: playerName, stroke });
+export const sendStroke = async (roomId, playerName, stroke) => {
+    try {
+        await fetch(`${API_URL}/send_stroke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId, player_name: playerName, stroke })
+        });
+    } catch (e) {
+        // Silent fail for high-frequency calls
+    }
 };
 
-export const clearCanvas = (roomId) => {
-    getSocket().emit('clear_canvas', { room_id: roomId });
+export const getStrokes = async (roomId, since = 0) => {
+    try {
+        const res = await fetch(`${API_URL}/strokes/${roomId}?since=${since}`);
+        if (!res.ok) return { strokes: [], total: since };
+        return await res.json();
+    } catch (e) {
+        return { strokes: [], total: since };
+    }
+};
+
+export const clearCanvas = async (roomId) => {
+    try {
+        await fetch(`${API_URL}/clear_canvas`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ room_id: roomId })
+        });
+    } catch (e) {
+        console.error("Clear canvas error:", e);
+    }
 };
 
 export const leaveRoom = async (roomId, playerName) => {

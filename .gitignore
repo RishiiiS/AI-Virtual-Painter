@@ -1,4 +1,18 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 .DS_Store
+# Ignore Jupyter and test files
+*.ipynb
+test_*
+# Ignore editor and OS files
+.vscode/
+.idea/
+.DS_Store
+# Ignore build and cache
+build/
+dist/
+# Ignore log files
+*.log
+logs/

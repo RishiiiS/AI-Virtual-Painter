@@ -7,8 +7,8 @@ import Palette from './components/Palette';
 import GameChat from './components/GameChat';
 import PlayerList from './components/PlayerList';
 import ResultPage from './components/ResultPage';
-import { getState, sendChat, joinRoom, leaveRoom, sendStroke, endRoom } from './api';
-import { getSocket, joinSignalingRoom, sendOffer, sendAnswer, sendIceCandidate, onNewGuesser, onOffer, onAnswer, onIceCandidate, disconnectSignaling } from './signaling';
+import { getState, sendChat, joinRoom, leaveRoom, sendStroke, getStrokes, endRoom } from './api';
+import { joinSignalingRoom, sendOffer, sendAnswer, sendIceCandidate, onNewGuesser, onOffer, onAnswer, onIceCandidate, disconnectSignaling } from './signaling';
 
 import SoundManager from './utils/SoundManager'; // Import SoundManager
 
@@ -289,32 +289,17 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
         return () => clearInterval(interval);
     }, [roomId, playerName, onEndGame]);
 
-    // Socket.IO realtime events for Drawer/System Actions
+    // Poll strokes (for guessers to see what's being drawn)
     useEffect(() => {
-        const socket = getSocket();
-
-        const handleNewStroke = (strokeJsonStr) => {
-            if (isDrawer) return; // Drawer doesn't need to receive their own strokes recursively
-            try {
-                const strokeObj = JSON.parse(strokeJsonStr);
-                setNewStrokes([strokeObj]); // Pass wrapped in array to DrawingCanvas
-            } catch (e) {
-                console.error("Error parsing stroke", e);
+        const interval = setInterval(async () => {
+            if (isDrawer) return; // Drawer draws locally, no need to poll
+            const result = await getStrokes(roomId, strokeIndexRef.current);
+            if (result.strokes && result.strokes.length > 0) {
+                setNewStrokes(result.strokes);
+                strokeIndexRef.current = result.total;
             }
-        };
-
-        const handleClearCanvas = () => {
-            if (isDrawer) return;
-            setNewStrokes([{ action: 'clear' }]);
-        };
-
-        socket.on('draw_stroke', handleNewStroke);
-        socket.on('clear_canvas', handleClearCanvas);
-
-        return () => {
-            socket.off('draw_stroke', handleNewStroke);
-            socket.off('clear_canvas', handleClearCanvas);
-        };
+        }, 500); // 500ms polling for responsive drawing
+        return () => clearInterval(interval);
     }, [roomId, isDrawer]);
 
     const handleSendMessage = (msg) => {

@@ -8,7 +8,7 @@ let socket = null;
 export const getSocket = () => {
     if (!socket) {
         socket = io(SIGNALING_URL, {
-            transports: ['websocket'],
+            transports: ['websocket', 'polling'],
             autoConnect: true
         });
 
