@@ -1,6 +1,10 @@
 import { getSocket } from './signaling';
+const BACKEND_ORIGIN = (
+    import.meta.env.VITE_BACKEND_ORIGIN ||
+    (import.meta.env.DEV ? 'http://localhost:5001' : window.location.origin)
+).replace(/\/$/, '');
 
-const API_URL = 'http://localhost:5001/api';
+const API_URL = `${BACKEND_ORIGIN}/api`;
 
 export const getState = async () => {
     try {

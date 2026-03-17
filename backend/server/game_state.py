@@ -9,6 +9,8 @@ class GameState:
         self.rooms = {}
         # Stores (room_id, player_name) -> threading.Timer
         self.disconnect_timers = {}
+        # Reentrant lock is required because some methods call other lock-protected
+        # methods (for example end_round -> cancel_timer).
         self.lock = threading.RLock()
 
     def create_room_if_missing(self, room_id):
@@ -283,6 +285,12 @@ class GameState:
         result = {'removed': False, 'was_drawer': False}
         
         with self.lock:
+            # Snapshot whether this player is the active drawer right now.
+            if room_id in self.rooms:
+                room = self.rooms[room_id]
+                if room.get('round_active') and room.get('drawer') == player_name:
+                    result['was_drawer'] = True
+
             # Cancel existing timer if any
             if timer_key in self.disconnect_timers:
                 self.disconnect_timers[timer_key].cancel()
@@ -618,12 +626,7 @@ class GameState:
                 
             # Check if sender is drawer
             drawer_name = room.get('drawer')
-            player_name = self.get_player_name(room_id, conn) # Verify we can call this inside lock? 
-            # Wait, get_player_name takes lock. recursive lock? 
-            # RLock is needed if we call internal methods that take lock.
-            # `self.lock = threading.Lock()` is standard lock. 
-            # So I should copy logic or use RLock. 
-            # For simplicity, I will access dict directly since I already hold lock here.
+            player_name = "Unknown"
             
             if 'players' in room and conn in room['players']:
                 player_data = room['players'][conn]
@@ -635,7 +638,7 @@ class GameState:
                 return "chat", None # Drawer can't guess
                 
             # Check if already guessed
-            if conn in room['guessed_players']:
+            if player_name in room['guessed_players']:
                 return "chat", None # Already guessed, just chat (or block?)
 
             # Check matching
@@ -682,9 +685,8 @@ class GameState:
                 for data in room['players'].values():
                     unique_player_names.add(data['name'])
                 
-                total_players = len(unique_player_names)
-                # Drawer is one unique name
-                total_guessers = total_players - 1 if total_players > 0 else 0
+                # Count only non-drawer unique players as guessers.
+                total_guessers = len([n for n in unique_player_names if n != drawer_name])
                 
                 if len(room['guessed_players']) >= total_guessers and total_guessers > 0:
                     return "round_over", 10

@@ -1,6 +1,9 @@
 import { io } from 'socket.io-client';
 
-const SIGNALING_URL = 'http://localhost:5001';
+const SIGNALING_URL = (
+    import.meta.env.VITE_BACKEND_ORIGIN ||
+    (import.meta.env.DEV ? 'http://localhost:5001' : window.location.origin)
+).replace(/\/$/, '');
 
 // Singleton socket instance
 let socket = null;

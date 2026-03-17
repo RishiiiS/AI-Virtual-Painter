@@ -228,7 +228,7 @@ def _process_chat_message(room_id, sender, message):
                         
                         # Check if ALL guessers have guessed
                         unique_names = set(pd['name'] for pd in room['players'].values())
-                        total_guessers = len(unique_names) - 1
+                        total_guessers = len([n for n in unique_names if n != drawer_name])
                         
                         if len(room['guessed_players']) >= total_guessers and total_guessers > 0:
                             guess_result = "round_over"
@@ -699,33 +699,38 @@ def leave_room():
     stroke_mod = _ensure_stroke_server_module()
     result = game_state_ref.schedule_remove_web_client(room_id, player_name)
     
-    # If the drawer left mid-round, immediately start a new round with remaining players
+    # If the active drawer left, wait out the reconnect grace period (3s) and then
+    # start a fresh round with the remaining players if they did not return.
     if result.get('was_drawer') and stroke_mod:
-        # Check there are still players in the room
-        has_players = False
-        with game_state_ref.lock:
-            if room_id in game_state_ref.rooms:
-                has_players = len(game_state_ref.rooms[room_id].get('players', {})) > 0
-        
-        if has_players:
-            # Broadcast drawer-left message
-            import json as _json
-            from protocol import Protocol as _Proto
-            sys_msg = _json.dumps({
-                _Proto.ACTION: _Proto.CHAT,
-                _Proto.PAYLOAD: f"SYSTEM: The drawer ({player_name}) left! Starting a new round..."
-            })
-            stroke_mod.broadcast(room_id, sys_msg)
-            
-            # Get room duration and start new round immediately
+        def restart_if_drawer_gone():
+            should_restart = False
             room_duration = 60
             with game_state_ref.lock:
                 if room_id in game_state_ref.rooms:
-                    room_duration = game_state_ref.rooms[room_id].get('room_duration', 60)
-            
-            import threading
-            t = threading.Timer(2.0, stroke_mod.handle_start_game, args=[room_id, None], kwargs={'duration': room_duration})
-            t.start()
+                    room = game_state_ref.rooms[room_id]
+                    players = room.get('players', {})
+                    has_players = len(players) > 0
+                    # After delayed removal, drawer is None only if they actually left.
+                    drawer_missing = room.get('drawer') is None
+                    round_inactive = not room.get('round_active', False)
+                    room_duration = room.get('room_duration', 60)
+                    should_restart = has_players and drawer_missing and round_inactive
+
+            if should_restart:
+                import json as _json
+                from protocol import Protocol as _Proto
+                sys_msg = _json.dumps({
+                    _Proto.ACTION: _Proto.CHAT,
+                    _Proto.PAYLOAD: f"SYSTEM: The drawer ({player_name}) left! Starting next round..."
+                })
+                stroke_mod.broadcast(room_id, sys_msg)
+                stroke_mod.handle_start_game(room_id, None, duration=room_duration)
+        
+        import threading
+        # Must be greater than GameState's 3.0s disconnect grace timer.
+        t = threading.Timer(3.2, restart_if_drawer_gone)
+        t.daemon = True
+        t.start()
     
     return jsonify({"status": "left" if result.get('removed') else "not_found"})
 
