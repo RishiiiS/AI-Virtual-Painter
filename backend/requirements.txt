@@ -4,3 +4,6 @@ numpy
 flask
 flask-cors
 flask-socketio
+gunicorn
+eventlet
+gevent-websocket

@@ -9,7 +9,7 @@ class GameState:
         self.rooms = {}
         # Stores (room_id, player_name) -> threading.Timer
         self.disconnect_timers = {}
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     def create_room_if_missing(self, room_id):
         with self.lock:
@@ -106,43 +106,13 @@ class GameState:
         return 0
 
 
-    def add_client(self, room_id, conn, player_name="Unknown"):
-        self.create_room_if_missing(room_id)
-        with self.lock:
-            # Check if player is already in (by connection)
-            # Actually, we might have multiple players with same name? Let's allow for now.
-            
-            # Use connection as key for metadata
-            # Structure: players = { conn: {'name': '...', 'score': 0, 'is_host': ...} }
-            
-            if 'players' not in self.rooms[room_id]:
-                self.rooms[room_id]['players'] = {}
-            
-            if conn not in self.rooms[room_id]['clients']:
-                self.rooms[room_id]['clients'].append(conn)
-            
-            # Determine if host (first player is host)
-            is_host = len(self.rooms[room_id]['players']) == 0
-            
-            self.rooms[room_id]['players'][conn] = {
-                'name': player_name,
-                'score': 0,
-                'is_host': is_host,
-                'is_ready': is_host # Host is implicitly ready (or doesn't matter)
-            }
-            
-            print(f"Added player {player_name} to {room_id} (Host: {is_host})")
-
-    def set_player_ready(self, room_id, conn, is_ready):
+    def set_player_ready(self, room_id, player_name, is_ready):
         """Set ready status for ALL connections with the same player name."""
         with self.lock:
             if room_id in self.rooms and 'players' in self.rooms[room_id]:
-                if conn in self.rooms[room_id]['players']:
-                    player_name = self.rooms[room_id]['players'][conn]['name']
-                    # Update ALL connections for this player name
-                    for c, p in self.rooms[room_id]['players'].items():
-                        if p['name'] == player_name:
-                            p['is_ready'] = is_ready
+                web_key = f"web_{player_name}"
+                if web_key in self.rooms[room_id]['players']:
+                    self.rooms[room_id]['players'][web_key]['is_ready'] = is_ready
                     print(f"Player {player_name} ready: {is_ready}")
 
     def are_all_players_ready(self, room_id):
@@ -176,25 +146,8 @@ class GameState:
             
             return True
 
-    def remove_client(self, room_id, conn):
-        with self.lock:
-            if room_id in self.rooms:
-                if conn in self.rooms[room_id]['clients']:
-                    self.rooms[room_id]['clients'].remove(conn)
-                was_host = False
-                if 'players' in self.rooms[room_id] and conn in self.rooms[room_id]['players']:
-                    was_host = self.rooms[room_id]['players'][conn].get('is_host', False)
-                    del self.rooms[room_id]['players'][conn]
-                
-                # If the host left, reassign to the next player
-                if was_host and self.rooms[room_id].get('players'):
-                    next_player_key = next(iter(self.rooms[room_id]['players']))
-                    self.rooms[room_id]['players'][next_player_key]['is_host'] = True
-                    new_host = self.rooms[room_id]['players'][next_player_key]['name']
-                    print(f"Host left {room_id}. New host: {new_host}")
-
-    def remove_web_client(self, room_id, player_name):
-        """Remove a web player and reassign host if needed.
+    def remove_client(self, room_id, player_name):
+        """Remove a player and reassign host if needed.
         Returns dict: {'removed': bool, 'was_drawer': bool}
         """
         web_key = f"web_{player_name}"
@@ -217,7 +170,7 @@ class GameState:
                     
                     
                     del self.rooms[room_id]['players'][web_key]
-                    print(f"Removed web player {player_name} from {room_id}")
+                    print(f"Removed player {player_name} from {room_id}")
                     result['removed'] = True
                     
                     # If the host left, reassign to the next player
@@ -227,8 +180,8 @@ class GameState:
                         new_host = self.rooms[room_id]['players'][next_player_key]['name']
                         print(f"Host left {room_id}. New host: {new_host}")
         return result
-
-    def schedule_remove_web_client(self, room_id, player_name):
+        
+    def schedule_remove_client(self, room_id, player_name):
         """Wait 3 seconds before actually removing a player. 
         This prevents Host reassignment during quick page refreshes.
         Returns a mock result so admin.py doesn't crash."""
@@ -244,9 +197,9 @@ class GameState:
             # We delay it to see if they come back.
             def delayed_remove():
                 print(f"Executing delayed remove for {player_name} in {room_id}")
-                actual_result = self.remove_web_client(room_id, player_name)
+                actual_result = self.remove_client(room_id, player_name)
                 
-                # If they were the active drawer and actually left, we need to notify the stroke server
+                # If they were the active drawer and actually left, we need to notify
                 # to handle the early round end. This is tricky since we are now in a detached thread.
                 # Easiest way: The stroke_server auto-detects empty rooms and missing drawers in its poll loops,
                 # or wait for the round timer to run out.
@@ -260,8 +213,8 @@ class GameState:
             
         return result
 
-    def add_web_client(self, room_id, player_name, avatar='ghost'):
-        """Register a web player using a string key (no TCP socket)."""
+    def add_client(self, room_id, player_name, avatar='ghost'):
+        """Register a player using a string key."""
         self.create_room_if_missing(room_id)
         with self.lock:
             if 'players' not in self.rooms[room_id]:
@@ -295,8 +248,8 @@ class GameState:
             print(f"Added web player {player_name} (avatar: {avatar}) to {room_id} (Host: {is_host})")
             return web_key
 
-    def is_web_drawer(self, room_id, player_name):
-        """Check if a web player (by name) is the current drawer."""
+    def is_drawer(self, room_id, player_name):
+        """Check if a player (by name) is the current drawer."""
         with self.lock:
             if room_id in self.rooms:
                 room = self.rooms[room_id]
@@ -353,12 +306,6 @@ class GameState:
             if room_id in self.rooms:
                 return list(self.rooms[room_id]['history'])
             return []
-            
-    def is_host(self, room_id, conn):
-        with self.lock:
-            if room_id in self.rooms and 'players' in self.rooms[room_id]:
-                 if conn in self.rooms[room_id]['players']:
-                     return self.rooms[room_id]['players'][conn]['is_host']
         return False
         
     def set_round_active(self, room_id, active):
@@ -417,11 +364,9 @@ class GameState:
                         if player_exists:
                              room['drawer'] = next_drawer
                              return next_drawer
-                
-                return None
         return None
         
-    def is_drawer(self, room_id, conn):
+    def is_drawer(self, room_id, player_name):
         with self.lock:
             if room_id in self.rooms:
                 room = self.rooms[room_id]
@@ -434,8 +379,9 @@ class GameState:
                 if not drawer_name:
                     return True # Should not happen if round is active, but fallback
                 
-                if 'players' in room and conn in room['players']:
-                    return room['players'][conn]['name'] == drawer_name
+                web_key = f"web_{player_name}"
+                if 'players' in room and web_key in room['players']:
+                    return room['players'][web_key]['name'] == drawer_name
         return False
 
     def cleanup_empty_rooms(self):
@@ -443,13 +389,18 @@ class GameState:
         pass
 
     def end_round(self, room_id):
+        print(f"DEBUG: Entering end_round for {room_id}", flush=True)
         with self.lock:
             if room_id not in self.rooms:
+                print(f"DEBUG: end_round returning None because {room_id} not in self.rooms", flush=True)
                 return None
             
             room = self.rooms[room_id]
             if not room.get('round_active'):
+                print(f"DEBUG: end_round returning None because round_active is False", flush=True)
                 return None
+            
+            print(f"DEBUG: end_round proceeding for {room_id}...", flush=True)
 
             # 1. Drawer Bonus — only if at least one person guessed
             drawer_name = room.get('drawer')
