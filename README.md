@@ -71,18 +71,20 @@ npm install
 
 ---
 
-## 🎮 How to Run
+## 🎮 How to Run (Local)
 
 1. **Start the Backend Server**
    ```bash
-   # From /backend/server directory
-   python stroke_server.py
+   # From project root
+   python -m gunicorn -k eventlet -w 1 --bind 0.0.0.0:5001 backend.wsgi:app
    ```
-   *Runs on `localhost:8080` (WebSocket) and `5001` (HTTP Admin).*
+   *Runs on `localhost:5001` (API + Socket.IO).*
+   *Optional raw TCP stroke server on port `8080`: set `ENABLE_STROKE_TCP=1`.*
 
 2. **Start the Frontend**
    ```bash
    # From /frontend directory
+   cp .env.example .env   # first time only (adjust if needed)
    npm run dev
    ```
    *Runs on `localhost:5173`.*
@@ -144,5 +146,20 @@ AI-Virtual-Painter/
   ```bash
   lsof -ti :8080 | xargs kill -9
   ```
+
+## 🌐 Deployment Notes
+
+- Backend entrypoint is `backend.wsgi:app`.
+- Frontend reads backend URL from `VITE_BACKEND_ORIGIN`.
+  - Local default: `http://localhost:5001`
+  - Production recommended: same domain as frontend API host.
+- Use a single backend worker for in-memory game state consistency:
+  ```bash
+  gunicorn -k eventlet -w 1 --bind 0.0.0.0:${PORT:-5001} backend.wsgi:app
+  ```
+- Optional environment variables:
+  - `BACKEND_HOST` / `BACKEND_PORT` (when running `python backend/wsgi.py`)
+  - `ENABLE_STROKE_TCP=1` to enable raw TCP stroke server
+  - `STROKE_HOST` / `STROKE_PORT` for raw TCP stroke server bind
 
 ---

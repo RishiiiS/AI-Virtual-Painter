@@ -14,8 +14,8 @@ from protocol import Protocol
 import word_manager
 import admin
 
-HOST = 'localhost'
-PORT = 8080
+HOST = os.getenv('STROKE_HOST', '0.0.0.0')
+PORT = int(os.getenv('STROKE_PORT', '8080'))
 
 game_state = GameState()
 
