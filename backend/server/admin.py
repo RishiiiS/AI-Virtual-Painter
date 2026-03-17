@@ -4,24 +4,29 @@ import threading
 import json
 import os
 import sys
+import time
 
 # Ensure we can import local modules
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
 from protocol import Protocol
+from game_state import GameState
 from flask_cors import CORS
+import word_manager
 
 app = Flask(__name__)
-CORS(app) # Allow all origins for dev simplicity
+CORS(app)  # Allow all origins for dev simplicity
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Global reference to game_state, set by run_admin
-game_state_ref = None
-stroke_server_module = None # To access finish_round and handle_start_game
+# Global game state
+game_state_ref = GameState()
+stroke_server_module = None
 
 # Track drawer Socket.IO SID per room
 _drawer_sids = {}  # { room_id: sid }
+
+
 
 @app.route('/')
 def index():
@@ -79,18 +84,17 @@ def get_state():
             # Compute time remaining dynamically
             time_remaining = 0
             if room_data.get('round_active'):
-                import time as _time
                 start = room_data.get('round_start_time', 0)
                 duration = room_data.get('round_duration', 60)
-                elapsed = _time.time() - start
+                elapsed = time.time() - start
                 time_remaining = max(0, int(duration - elapsed))
 
             # Intermission countdown (time until next round starts)
             intermission_remaining = 0
             intermission_end = room_data.get('intermission_end_time')
             if intermission_end and not room_data.get('round_active', False):
-                import time as _time2
-                intermission_remaining = max(0, int(intermission_end - _time2.time()))
+                intermission_remaining = max(0, int(intermission_end - time.time()))
+
 
             state_dump[room_id] = {
                 "round_active": room_data.get('round_active', False),
@@ -151,13 +155,141 @@ def check_room(room_id):
         "all_ready": all_ready
     })
 
+def _broadcast_web_chat(room_id, payload_text):
+    """Mirror chat updates to Socket.IO clients in the room."""
+    try:
+        socketio.emit('chat_message', {'payload': payload_text}, to=room_id)
+    except Exception as e:
+        print(f"[Socket.IO] chat_message emit error: {e}", flush=True)
+
+def _ensure_stroke_server_module():
+    """Resolve stroke_server module in both direct and package import modes."""
+    global stroke_server_module
+    if stroke_server_module is not None:
+        return stroke_server_module
+    try:
+        from backend.server import stroke_server as stroke_server_mod
+        stroke_server_module = stroke_server_mod
+    except Exception:
+        try:
+            import stroke_server as stroke_server_mod
+            stroke_server_module = stroke_server_mod
+        except Exception:
+            stroke_server_module = None
+    return stroke_server_module
+
+def _process_chat_message(room_id, sender, message):
+    """Shared chat/guess logic used by both HTTP and Socket.IO chat paths."""
+    stroke_mod = _ensure_stroke_server_module()
+    if stroke_mod is None:
+        return {"error": "Server modules not linked"}, 500
+
+    if not message:
+        return {"error": "No message"}, 400
+
+    web_key = f"web_{sender}"
+    guess_result = None
+    is_drawer = False
+    word_in_message = False
+    
+    with game_state_ref.lock:
+        if room_id in game_state_ref.rooms:
+            room = game_state_ref.rooms[room_id]
+            
+            if room.get('round_active') and room.get('current_word'):
+                current_word = room['current_word']
+                drawer_name = room.get('drawer')
+                is_drawer = (sender == drawer_name)
+                
+                # Block drawer from revealing the word
+                if is_drawer and current_word.lower() in message.strip().lower():
+                    word_in_message = True
+                
+                # Only check guesses from non-drawers who haven't guessed yet
+                if not is_drawer:
+                    # Already guessed? Block repeat scoring
+                    if sender in room.get('guessed_players', set()):
+                        guess_result = "already_guessed"
+                    elif message.strip().lower() == current_word.lower():
+                        # CORRECT GUESS — first time only
+                        room['guessed_players'].add(sender)
+                        
+                        # Score the guesser
+                        if web_key in room['players']:
+                            room['players'][web_key]['score'] += 100
+                            room['players'][web_key]['round_score'] = room['players'][web_key].get('round_score', 0) + 100
+                        
+                        # Score the drawer (+100 per correct guess)
+                        for _, pdata in room['players'].items():
+                            if pdata['name'] == drawer_name:
+                                pdata['score'] += 100
+                                pdata['round_score'] = pdata.get('round_score', 0) + 100
+                                break
+                        
+                        # Check if ALL guessers have guessed
+                        unique_names = set(pd['name'] for pd in room['players'].values())
+                        total_guessers = len(unique_names) - 1
+                        
+                        if len(room['guessed_players']) >= total_guessers and total_guessers > 0:
+                            guess_result = "round_over"
+                        else:
+                            guess_result = "correct"
+    
+    # --- Handle results outside the lock ---
+    if word_in_message:
+        # Drawer tried to type the word — block it silently
+        return {"status": "blocked", "reason": "Cannot reveal the word!"}, 200
+    
+    if guess_result == "already_guessed":
+        # Player already guessed correctly — just show their message as normal chat, no points
+        payload = f"[{sender}]: {message}"
+        chat_msg = json.dumps({
+            Protocol.ACTION: Protocol.CHAT,
+            Protocol.PAYLOAD: payload
+        })
+        stroke_mod.broadcast(room_id, chat_msg)
+        _broadcast_web_chat(room_id, payload)
+        return {"status": "already_guessed"}, 200
+    
+    if guess_result == "correct":
+        payload = f"SYSTEM: {sender} guessed the word! (+100 pts)"
+        sys_msg = json.dumps({
+            Protocol.ACTION: Protocol.CHAT,
+            Protocol.PAYLOAD: payload
+        })
+        stroke_mod.broadcast(room_id, sys_msg)
+        _broadcast_web_chat(room_id, payload)
+        return {"status": "correct"}, 200
+    
+    if guess_result == "round_over":
+        payload = f"SYSTEM: {sender} guessed the word! (+100 pts)"
+        sys_msg = json.dumps({
+            Protocol.ACTION: Protocol.CHAT,
+            Protocol.PAYLOAD: payload
+        })
+        stroke_mod.broadcast(room_id, sys_msg)
+        _broadcast_web_chat(room_id, payload)
+        stroke_mod.finish_round(room_id)
+        return {"status": "round_over"}, 200
+    
+    # Normal chat (wrong guess, no round, or drawer chatting without the word)
+    payload = f"[{sender}]: {message}"
+    chat_msg = json.dumps({
+        Protocol.ACTION: Protocol.CHAT,
+        Protocol.PAYLOAD: payload
+    })
+    stroke_mod.broadcast(room_id, chat_msg)
+    _broadcast_web_chat(room_id, payload)
+    return {"status": "sent"}, 200
+
 @app.route('/api/action', methods=['POST'])
 def perform_action():
     data = request.json
     action = data.get('action')
     room_id = data.get('room_id')
     
-    if not game_state_ref or not stroke_server_module:
+    stroke_mod = _ensure_stroke_server_module()
+    if not game_state_ref or not stroke_mod:
         return jsonify({"error": "Server modules not linked"}), 500
 
     print(f"ADMIN ACTION: {action} on {room_id}")
@@ -169,12 +301,12 @@ def perform_action():
         duration = data.get('duration', 60)
         # Clamp to valid range (30s - 180s)
         duration = max(30, min(180, int(duration)))
-        stroke_server_module.handle_start_game(room_id, None, duration=duration)
+        stroke_mod.handle_start_game(room_id, None, duration=duration)
         return jsonify({"status": "started", "duration": duration})
         
     elif action == "end_round":
         # Call finish_round
-        stroke_server_module.finish_round(room_id)
+        stroke_mod.finish_round(room_id)
         return jsonify({"status": "ended"})
         
     elif action == "kick":
@@ -212,96 +344,8 @@ def perform_action():
     elif action == "send_chat":
         message = data.get('message')
         sender = data.get('sender', 'ADMIN')
-        if not message:
-            return jsonify({"error": "No message"}), 400
-        
-        web_key = f"web_{sender}"
-        guess_result = None
-        is_drawer = False
-        word_in_message = False
-        
-        with game_state_ref.lock:
-            if room_id in game_state_ref.rooms:
-                room = game_state_ref.rooms[room_id]
-                
-                if room.get('round_active') and room.get('current_word'):
-                    current_word = room['current_word']
-                    drawer_name = room.get('drawer')
-                    is_drawer = (sender == drawer_name)
-                    
-                    # Block drawer from revealing the word
-                    if is_drawer and current_word.lower() in message.strip().lower():
-                        word_in_message = True
-                    
-                    # Only check guesses from non-drawers who haven't guessed yet
-                    if not is_drawer:
-                        # Already guessed? Block repeat scoring
-                        if sender in room.get('guessed_players', set()):
-                            guess_result = "already_guessed"
-                        elif message.strip().lower() == current_word.lower():
-                            # CORRECT GUESS — first time only
-                            room['guessed_players'].add(sender)
-                            
-                            # Score the guesser
-                            if web_key in room['players']:
-                                room['players'][web_key]['score'] += 100
-                                room['players'][web_key]['round_score'] = room['players'][web_key].get('round_score', 0) + 100
-                            
-                            # Score the drawer (+100 per correct guess)
-                            for c, pdata in room['players'].items():
-                                if pdata['name'] == drawer_name:
-                                    pdata['score'] += 100
-                                    pdata['round_score'] = pdata.get('round_score', 0) + 100
-                                    break
-                            
-                            # Check if ALL guessers have guessed
-                            unique_names = set(pd['name'] for pd in room['players'].values())
-                            total_guessers = len(unique_names) - 1
-                            
-                            if len(room['guessed_players']) >= total_guessers and total_guessers > 0:
-                                guess_result = "round_over"
-                            else:
-                                guess_result = "correct"
-        
-        # --- Handle results outside the lock ---
-        
-        if word_in_message:
-            # Drawer tried to type the word — block it silently
-            return jsonify({"status": "blocked", "reason": "Cannot reveal the word!"})
-        
-        if guess_result == "already_guessed":
-            # Player already guessed correctly — just show their message as normal chat, no points
-            chat_msg = json.dumps({
-                Protocol.ACTION: Protocol.CHAT,
-                Protocol.PAYLOAD: f"[{sender}]: {message}"
-            })
-            stroke_server_module.broadcast(room_id, chat_msg)
-            return jsonify({"status": "already_guessed"})
-        
-        if guess_result == "correct":
-            sys_msg = json.dumps({
-                Protocol.ACTION: Protocol.CHAT,
-                Protocol.PAYLOAD: f"SYSTEM: {sender} guessed the word! (+100 pts)"
-            })
-            stroke_server_module.broadcast(room_id, sys_msg)
-            return jsonify({"status": "correct"})
-        
-        if guess_result == "round_over":
-            sys_msg = json.dumps({
-                Protocol.ACTION: Protocol.CHAT,
-                Protocol.PAYLOAD: f"SYSTEM: {sender} guessed the word! (+100 pts)"
-            })
-            stroke_server_module.broadcast(room_id, sys_msg)
-            stroke_server_module.finish_round(room_id)
-            return jsonify({"status": "round_over"})
-        
-        # Normal chat (wrong guess, no round, or drawer chatting without the word)
-        chat_msg = json.dumps({
-            Protocol.ACTION: Protocol.CHAT,
-            Protocol.PAYLOAD: f"[{sender}]: {message}"
-        })
-        stroke_server_module.broadcast(room_id, chat_msg)
-        return jsonify({"status": "sent"})
+        response_body, status_code = _process_chat_message(room_id, sender, message)
+        return jsonify(response_body), status_code
 
     elif action == "ready_up":
         sender = data.get('sender')
@@ -412,6 +456,115 @@ def handle_webrtc_ice(data):
     
     emit('webrtc_ice_candidate', {'candidate': candidate, 'from': request.sid}, to=target_sid)
 
+@socketio.on('start_game')
+def handle_socket_start_game(data):
+    """Host triggers game start via Socket.IO"""
+    from backend.server import stroke_server as stroke_server_mod
+    room_id = data.get('room_id')
+    duration = data.get('duration', 60)
+    duration = max(30, min(180, int(duration)))
+
+    if not room_id:
+        return
+
+    if not game_state_ref.are_all_players_ready(room_id):
+        emit('error', {'message': 'Not all players are ready!'})
+        return
+
+    print(f"[StartGame] Host starting room {room_id} with duration={duration}", flush=True)
+    threading.Thread(
+        target=stroke_server_mod.handle_start_game,
+        args=[room_id, None],
+        kwargs={'duration': duration},
+        daemon=True
+    ).start()
+
+@socketio.on('ready_up')
+def handle_ready_up(data):
+
+    """Toggle ready status via Socket.IO"""
+    room_id = data.get('room_id')
+    sender = data.get('sender')
+    is_ready = data.get('is_ready', False)
+
+    if not sender or not room_id:
+        return
+
+    with game_state_ref.lock:
+        if room_id in game_state_ref.rooms:
+            room = game_state_ref.rooms[room_id]
+            for conn, p in room['players'].items():
+                if p['name'] == sender:
+                    p['is_ready'] = is_ready
+                    # Don't break — update ALL connections for this player name
+
+    print(f"[Ready] {sender} in {room_id}: ready={is_ready}", flush=True)
+
+@socketio.on('chat_message')
+def handle_chat_message(data):
+    """Web chat event used by lobby and gameplay UIs."""
+    room_id = data.get('room_id')
+    sender = data.get('sender', 'WebPlayer')
+    message = data.get('message')
+
+    if not room_id:
+        emit('error', {'message': 'Missing room_id'})
+        return
+
+    body, status_code = _process_chat_message(room_id, sender, message)
+    if status_code >= 400:
+        emit('error', {'message': body.get('error', 'Chat failed')})
+        return
+    if body.get('status') == 'blocked':
+        emit('error', {'message': body.get('reason', 'Cannot reveal the word!')})
+
+@socketio.on('draw_stroke')
+def handle_draw_stroke(data):
+    """Receive drawer strokes from web client and persist/broadcast them."""
+    stroke_mod = _ensure_stroke_server_module()
+    if stroke_mod is None:
+        emit('error', {'message': 'Server modules not linked'})
+        return
+
+    room_id = data.get('room_id')
+    player_name = data.get('player_name')
+    stroke = data.get('stroke')
+
+    if not room_id or stroke is None:
+        emit('error', {'message': 'Missing room_id or stroke'})
+        return
+
+    if not game_state_ref.is_web_drawer(room_id, player_name):
+        return
+
+    try:
+        stroke_json = json.dumps(stroke)
+        game_state_ref.add_stroke(room_id, stroke_json)
+        stroke_mod.broadcast(room_id, stroke_json)
+    except Exception as e:
+        print(f"[Socket.IO] draw_stroke error: {e}", flush=True)
+        emit('error', {'message': 'Failed to process stroke'})
+
+@socketio.on('clear_canvas')
+def handle_clear_canvas(data):
+    """Clear room canvas history and broadcast clear signal."""
+    stroke_mod = _ensure_stroke_server_module()
+    if stroke_mod is None:
+        emit('error', {'message': 'Server modules not linked'})
+        return
+
+    room_id = data.get('room_id')
+    if not room_id:
+        emit('error', {'message': 'Missing room_id'})
+        return
+
+    with game_state_ref.lock:
+        if room_id in game_state_ref.rooms:
+            game_state_ref.rooms[room_id]['history'] = []
+
+    clear_msg = json.dumps({"action": "clear"})
+    stroke_mod.broadcast(room_id, clear_msg)
+
 # ─── Server Startup ───
 
 def run_admin(game_state, stroke_server_mod):
@@ -503,6 +656,15 @@ def end_room():
             if is_host:
                 # Cancel any running timers
                 game_state_ref.cancel_timer(room_id)
+
+                # Notify all Socket.IO clients in this room before deletion.
+                try:
+                    socketio.emit('room_ended', {
+                        'room_id': room_id,
+                        'reason': 'host_ended'
+                    }, to=room_id)
+                except Exception as e:
+                    print(f"[Socket.IO] room_ended emit error: {e}", flush=True)
                 
                 # Close all connections gracefully
                 conns_to_close = list(room['players'].keys())
@@ -534,10 +696,11 @@ def leave_room():
     if not room_id or not player_name:
         return jsonify({"error": "Missing room_id or player_name"}), 400
     
+    stroke_mod = _ensure_stroke_server_module()
     result = game_state_ref.schedule_remove_web_client(room_id, player_name)
     
     # If the drawer left mid-round, immediately start a new round with remaining players
-    if result.get('was_drawer') and stroke_server_module:
+    if result.get('was_drawer') and stroke_mod:
         # Check there are still players in the room
         has_players = False
         with game_state_ref.lock:
@@ -552,7 +715,7 @@ def leave_room():
                 _Proto.ACTION: _Proto.CHAT,
                 _Proto.PAYLOAD: f"SYSTEM: The drawer ({player_name}) left! Starting a new round..."
             })
-            stroke_server_module.broadcast(room_id, sys_msg)
+            stroke_mod.broadcast(room_id, sys_msg)
             
             # Get room duration and start new round immediately
             room_duration = 60
@@ -561,7 +724,7 @@ def leave_room():
                     room_duration = game_state_ref.rooms[room_id].get('room_duration', 60)
             
             import threading
-            t = threading.Timer(2.0, stroke_server_module.handle_start_game, args=[room_id, None], kwargs={'duration': room_duration})
+            t = threading.Timer(2.0, stroke_mod.handle_start_game, args=[room_id, None], kwargs={'duration': room_duration})
             t.start()
     
     return jsonify({"status": "left" if result.get('removed') else "not_found"})
@@ -569,7 +732,8 @@ def leave_room():
 @app.route('/api/send_stroke', methods=['POST'])
 def send_stroke():
     """Accept a stroke from a web drawer and broadcast to TCP clients."""
-    if not game_state_ref or not stroke_server_module:
+    stroke_mod = _ensure_stroke_server_module()
+    if not game_state_ref or not stroke_mod:
         return jsonify({"error": "Server not linked"}), 500
     
     data = request.json
@@ -589,7 +753,7 @@ def send_stroke():
     game_state_ref.add_stroke(room_id, stroke_json)
     
     # Broadcast to TCP clients (no exclude since web client isn't a TCP conn)
-    stroke_server_module.broadcast(room_id, stroke_json)
+    stroke_mod.broadcast(room_id, stroke_json)
     
     return jsonify({"status": "ok"})
 
@@ -618,7 +782,8 @@ def get_strokes(room_id):
 @app.route('/api/clear_canvas', methods=['POST'])
 def clear_canvas():
     """Clear stroke history and broadcast clear to TCP clients."""
-    if not game_state_ref or not stroke_server_module:
+    stroke_mod = _ensure_stroke_server_module()
+    if not game_state_ref or not stroke_mod:
         return jsonify({"error": "Server not linked"}), 500
     
     data = request.json
@@ -634,6 +799,6 @@ def clear_canvas():
     
     # Broadcast clear command to TCP clients
     clear_msg = json.dumps({"action": "clear"})
-    stroke_server_module.broadcast(room_id, clear_msg)
+    stroke_mod.broadcast(room_id, clear_msg)
     
     return jsonify({"status": "cleared"})

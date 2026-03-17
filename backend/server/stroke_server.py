@@ -159,6 +159,21 @@ def finish_round(room_id):
         })
         broadcast(room_id, round_over_msg)
         
+        # --- SOCKET.IO BROADCAST FOR WEB CLIENTS ---
+        try:
+            from admin import socketio
+            # Get the word that was just played
+            last_word = None
+            with game_state.lock:
+                if room_id in game_state.rooms:
+                    last_word = game_state.rooms[room_id].get('last_word')
+                    
+            print(f"[Socket.IO] Emitting round_over to room {room_id}")
+            socketio.emit('round_over', {'scores': scores, 'word': last_word}, to=room_id)
+        except Exception as e:
+            print(f"[Socket.IO] Broadcast error in finish_round: {e}", flush=True)
+            
+
         # 5. Auto-Start Next Round in 10 seconds (preserve room duration)
         room_duration = 60
         with game_state.lock:
@@ -167,10 +182,15 @@ def finish_round(room_id):
                 # Store when the intermission ends so frontend can show countdown
                 game_state.rooms[room_id]['intermission_end_time'] = time.time() + 10.0
         print(f"Scheduling next round for {room_id} in 10s (duration={room_duration}s)...", flush=True)
-        t = threading.Timer(10.0, handle_start_game, args=[room_id, None], kwargs={'duration': room_duration}) 
-        t.daemon = True
-        t.start()
-        print(f"Timer started successfully for {room_id}", flush=True)
+        try:
+            import eventlet
+            eventlet.spawn_after(10.0, handle_start_game, room_id, None, duration=room_duration)
+        except ImportError:
+            # Fallback for non-eventlet environments
+            t = threading.Timer(10.0, handle_start_game, args=[room_id, None], kwargs={'duration': room_duration}) 
+            t.daemon = True
+            t.start()
+        print(f"Next round scheduled for {room_id}", flush=True)
     except Exception as e:
         print(f"CRITICAL ERROR in finish_round: {e}", flush=True)
         import traceback; traceback.print_exc()
@@ -372,6 +392,21 @@ def handle_start_game(room_id, sender_conn=None, duration=60):
                 client.sendall((word_msg + "\n").encode('utf-8'))
          except:
             pass
+            
+    # --- SOCKET.IO BROADCAST FOR WEB CLIENTS ---
+    try:
+        from admin import socketio
+        print(f"[Socket.IO] Emitting game_start to room {room_id}")
+        socketio.emit('game_start', {'duration': duration}, to=room_id)
+        socketio.emit('drawer_assign', {'player_name': drawer_name}, to=room_id)
+        
+        # We need to send YOUR_WORD specifically to the drawer's web socket if they are a web client
+        # Currently, web clients get the word via a separate API or socket event.
+        # Let's broadcast drawer_assign and let the Drawer component fetch the word if needed, 
+        # or we just broadcast your_word to the room and let the frontend filter by player name.
+        socketio.emit('your_word', {'word': word, 'drawer': drawer_name}, to=room_id)
+    except Exception as e:
+        print(f"[Socket.IO] Broadcast error in handle_start_game: {e}", flush=True)
 
 def start_server():
     # Start Admin UI in background
@@ -383,6 +418,8 @@ def start_server():
     except Exception as e:
         print(f"Failed to start Admin UI: {e}")
 
+def start_tcp_server_only():
+    """Starts only the raw TCP server for drawing strokes without touching admin.py"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
@@ -394,6 +431,18 @@ def start_server():
             thread = threading.Thread(target=handle_client, args=(conn, addr))
             thread.daemon = True
             thread.start()
+
+def start_server():
+    # Start Admin UI in background
+    try:
+        print("Starting Admin Admin UI on http://localhost:5001 ...")
+        import sys
+        # Pass current module so admin can call handle_start_game/finish_round
+        admin.run_admin(game_state, sys.modules[__name__]) 
+    except Exception as e:
+        print(f"Failed to start Admin UI: {e}")
+
+    start_tcp_server_only()
     
 if __name__ == "__main__":
     start_server()

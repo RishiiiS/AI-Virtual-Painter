@@ -70,9 +70,16 @@ function App() {
       setIsInitializing(false);
     };
     verifyState();
-  }, [roomId]);
+  }, []); // Run ONLY on mount — handles page refresh recovery, not new room navigation
+
 
   const [nicknameError, setNicknameError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const returnToHome = React.useCallback(() => {
+    setIsHost(false);
+    setView('landing');
+  }, []);
 
   if (isInitializing) {
     return <div style={{
@@ -95,7 +102,8 @@ function App() {
           roomId={roomId}
           isHost={isHost}
           avatarKey={AVATAR_KEYS[selectedAvatar] || 'star'}
-          onEndGame={() => setView('landing')}
+          onEndGame={returnToHome}
+          onHostStatusChange={setIsHost}
         />
       </div>
     );
@@ -116,6 +124,8 @@ function App() {
           isHost={isHost}
           avatarKey={AVATAR_KEYS[selectedAvatar] || 'star'}
           onGameStart={() => setView('game')}
+          onRoomEnded={returnToHome}
+          onHostStatusChange={setIsHost}
         />
       </div>
     );
@@ -185,15 +195,23 @@ function App() {
                     setNicknameError("PLEASE ENTER A NICKNAME FIRST!");
                     return;
                   }
-                  const res = await createRoom();
-                  if (res.room_id) {
-                    setRoomId(res.room_id);
-                    setIsHost(true);
-                    setView('lobby');
-                  } else {
-                    setNicknameError("Failed to create room: " + (res.error || "Unknown error"));
+                  if (isCreating) return;
+                  setIsCreating(true);
+                  try {
+                    const res = await createRoom();
+                    if (res.room_id) {
+                      setRoomId(res.room_id);
+                      setIsHost(true);
+                      setView('lobby');
+                    } else {
+                      setNicknameError("Failed to create room: " + (res.error || "Unknown error"));
+                    }
+                  } finally {
+                    setIsCreating(false);
                   }
                 }}
+                isCreating={isCreating}
+
                 onJoin={() => {
                   if (!nickname.trim()) {
                     setNicknameError("PLEASE ENTER A NICKNAME FIRST!");

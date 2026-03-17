@@ -9,7 +9,7 @@ class GameState:
         self.rooms = {}
         # Stores (room_id, player_name) -> threading.Timer
         self.disconnect_timers = {}
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     def create_room_if_missing(self, room_id):
         with self.lock:
@@ -28,9 +28,50 @@ class GameState:
                     'chat_history': [],
                     'latest_video_frame': None,
                     'last_round_results': [],
-                    'last_word': None
+                    'last_word': None,
+                    # Unique player names in first-join order for deterministic host handover.
+                    'player_join_order': []
                 }
                 print(f"Created new room: {room_id}")
+
+    def _sync_join_order_for_room(self, room_id):
+        """Keep join order list aligned with active players while preserving order."""
+        room = self.rooms.get(room_id, {})
+        players = room.get('players', {})
+        active_names = set(p.get('name') for p in players.values())
+        order = room.get('player_join_order', [])
+        room['player_join_order'] = [name for name in order if name in active_names]
+
+        # Add any active names missing from order as a fallback.
+        known = set(room['player_join_order'])
+        for p in players.values():
+            name = p.get('name')
+            if name and name not in known:
+                room['player_join_order'].append(name)
+                known.add(name)
+
+    def _assign_next_host(self, room_id):
+        """Assign host to the earliest-joined remaining player."""
+        room = self.rooms.get(room_id)
+        if not room or 'players' not in room or not room['players']:
+            return None
+
+        self._sync_join_order_for_room(room_id)
+        order = room.get('player_join_order', [])
+
+        next_host_name = None
+        if order:
+            next_host_name = order[0]
+        else:
+            # Safety fallback.
+            next_host_name = next(iter(room['players'].values())).get('name')
+
+        for pdata in room['players'].values():
+            pdata['is_host'] = (pdata.get('name') == next_host_name)
+
+        if next_host_name:
+            print(f"Host updated for {room_id}. New host: {next_host_name}")
+        return next_host_name
 
     # ... (add_client, remove_client, etc. remain same, skipping to select_drawer) ...
 
@@ -130,6 +171,8 @@ class GameState:
                 'is_host': is_host,
                 'is_ready': is_host # Host is implicitly ready (or doesn't matter)
             }
+            if player_name not in self.rooms[room_id]['player_join_order']:
+                self.rooms[room_id]['player_join_order'].append(player_name)
             
             print(f"Added player {player_name} to {room_id} (Host: {is_host})")
 
@@ -167,7 +210,8 @@ class GameState:
                     if p.get('is_ready', False):
                         unique_players[name]['is_ready'] = True
             
-            if len(unique_players) < 2:
+            # Allow host to start even alone (at least 1 player needed)
+            if len(unique_players) < 1:
                 return False
             
             for info in unique_players.values():
@@ -184,14 +228,19 @@ class GameState:
                 was_host = False
                 if 'players' in self.rooms[room_id] and conn in self.rooms[room_id]['players']:
                     was_host = self.rooms[room_id]['players'][conn].get('is_host', False)
+                    leaving_name = self.rooms[room_id]['players'][conn].get('name')
                     del self.rooms[room_id]['players'][conn]
+                    # If this player still has another connection, keep their join-order slot.
+                    still_present = any(
+                        p.get('name') == leaving_name
+                        for p in self.rooms[room_id].get('players', {}).values()
+                    )
+                    if not still_present:
+                        self._sync_join_order_for_room(room_id)
                 
                 # If the host left, reassign to the next player
                 if was_host and self.rooms[room_id].get('players'):
-                    next_player_key = next(iter(self.rooms[room_id]['players']))
-                    self.rooms[room_id]['players'][next_player_key]['is_host'] = True
-                    new_host = self.rooms[room_id]['players'][next_player_key]['name']
-                    print(f"Host left {room_id}. New host: {new_host}")
+                    self._assign_next_host(room_id)
 
     def remove_web_client(self, room_id, player_name):
         """Remove a web player and reassign host if needed.
@@ -219,13 +268,11 @@ class GameState:
                     del self.rooms[room_id]['players'][web_key]
                     print(f"Removed web player {player_name} from {room_id}")
                     result['removed'] = True
+                    self._sync_join_order_for_room(room_id)
                     
                     # If the host left, reassign to the next player
                     if was_host and self.rooms[room_id].get('players'):
-                        next_player_key = next(iter(self.rooms[room_id]['players']))
-                        self.rooms[room_id]['players'][next_player_key]['is_host'] = True
-                        new_host = self.rooms[room_id]['players'][next_player_key]['name']
-                        print(f"Host left {room_id}. New host: {new_host}")
+                        self._assign_next_host(room_id)
         return result
 
     def schedule_remove_web_client(self, room_id, player_name):
@@ -291,6 +338,8 @@ class GameState:
                 'is_ready': is_host,
                 'avatar': avatar
             }
+            if player_name not in self.rooms[room_id]['player_join_order']:
+                self.rooms[room_id]['player_join_order'].append(player_name)
             
             print(f"Added web player {player_name} (avatar: {avatar}) to {room_id} (Host: {is_host})")
             return web_key

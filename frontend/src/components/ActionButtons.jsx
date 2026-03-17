@@ -1,28 +1,28 @@
-
 import React from 'react';
 
-const ActionButtons = ({ onCreate, onJoin }) => {
+const ActionButtons = ({ onCreate, onJoin, isCreating = false }) => {
     return (
         <div style={{ display: 'flex', gap: '10px' }}>
             <button style={{
                 flex: 1,
                 padding: '15px',
-                backgroundColor: '#EBC334',
+                backgroundColor: isCreating ? '#ccc' : '#EBC334',
                 color: '#333',
                 border: '3px solid #333',
                 fontFamily: '"Titan One", sans-serif',
                 fontSize: '1.2rem',
                 textTransform: 'uppercase',
-                boxShadow: '4px 4px 0 #333',
-                cursor: 'pointer',
+                boxShadow: isCreating ? 'none' : '4px 4px 0 #333',
+                cursor: isCreating ? 'not-allowed' : 'pointer',
                 transition: 'transform 0.1s',
             }}
                 className="btn-sound"
                 onClick={onCreate}
-                onMouseDown={(e) => e.target.style.transform = 'translate(2px, 2px)'}
+                disabled={isCreating}
+                onMouseDown={(e) => { if (!isCreating) e.target.style.transform = 'translate(2px, 2px)'; }}
                 onMouseUp={(e) => e.target.style.transform = 'translate(0, 0)'}
             >
-                Create Room
+                {isCreating ? 'CREATING...' : 'Create Room'}
             </button>
 
             <button style={{

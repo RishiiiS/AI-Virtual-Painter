@@ -8,13 +8,13 @@ import GameChat from './components/GameChat';
 import PlayerList from './components/PlayerList';
 import ResultPage from './components/ResultPage';
 import { getState, sendChat, joinRoom, leaveRoom, sendStroke, getStrokes, endRoom } from './api';
-import { joinSignalingRoom, sendOffer, sendAnswer, sendIceCandidate, onNewGuesser, onOffer, onAnswer, onIceCandidate, disconnectSignaling } from './signaling';
+import { getSocket, joinSignalingRoom, sendOffer, sendAnswer, sendIceCandidate, onNewGuesser, onOffer, onAnswer, onIceCandidate, disconnectSignaling } from './signaling';
 
 import SoundManager from './utils/SoundManager'; // Import SoundManager
 
 const ICE_SERVERS = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => {
+const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame, onHostStatusChange }) => {
     const [gameState, setGameState] = useState(null);
     const [selectedTool, setSelectedTool] = useState('brush');
     const [selectedColor, setSelectedColor] = useState('#333333');
@@ -257,7 +257,50 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
         };
     }, [isDrawer, roomId]);
 
-    // Poll game state
+    // Listen to real-time game flow events via Socket.IO
+    useEffect(() => {
+        const socket = getSocket();
+
+        const handleDrawerAssign = (data) => {
+            console.log('[Socket.IO] Drawer assigned:', data.player_name);
+            setIsDrawer(data.player_name === playerName);
+            // We update the local state optimistically, the next poll will sync the rest
+            setGameState(prev => prev ? { ...prev, drawer: data.player_name } : prev);
+        };
+
+        const handleYourWord = (data) => {
+            console.log('[Socket.IO] Received word:', data.word);
+            setGameState(prev => prev ? { ...prev, current_word: data.word } : prev);
+        };
+
+        const handleRoundOver = (data) => {
+            console.log('[Socket.IO] Round over!', data);
+            setGameState(prev => prev ? {
+                ...prev,
+                round_active: false,
+                last_round_results: data.scores || [],
+                last_word: data.word || prev.current_word
+            } : prev);
+            SoundManager.setRoundActive(false);
+        };
+        const handleRoomEnded = () => {
+            onEndGame();
+        };
+
+        socket.on('drawer_assign', handleDrawerAssign);
+        socket.on('your_word', handleYourWord);
+        socket.on('round_over', handleRoundOver);
+        socket.on('room_ended', handleRoomEnded);
+
+        return () => {
+            socket.off('drawer_assign', handleDrawerAssign);
+            socket.off('your_word', handleYourWord);
+            socket.off('round_over', handleRoundOver);
+            socket.off('room_ended', handleRoomEnded);
+        };
+    }, [playerName, onEndGame]);
+
+    // Poll game state (sync periodic data like scores/timers)
     const hasReceivedStateRef = useRef(false);
     useEffect(() => {
         const interval = setInterval(async () => {
@@ -266,6 +309,10 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
                 hasReceivedStateRef.current = true;
                 const roomData = state[roomId];
                 setGameState(roomData);
+                const me = (roomData.players || []).find(p => p.name === playerName);
+                if (onHostStatusChange && me) {
+                    onHostStatusChange(Boolean(me.is_host));
+                }
 
                 const currentlyDrawer = roomData.drawer === playerName;
                 setIsDrawer(currentlyDrawer);
@@ -287,7 +334,7 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame }) => 
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [roomId, playerName, onEndGame]);
+    }, [roomId, playerName, onEndGame, onHostStatusChange]);
 
     // Poll strokes (for guessers to see what's being drawn)
     useEffect(() => {
