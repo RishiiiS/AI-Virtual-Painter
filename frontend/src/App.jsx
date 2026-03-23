@@ -143,18 +143,7 @@ function App() {
         <Header />
 
         {/* Main Card */}
-        <div style={{
-          backgroundColor: '#fff',
-          padding: 'clamp(20px, 5vw, 40px)',
-          width: '90%',
-          maxWidth: '500px',
-          boxSizing: 'border-box',
-          border: '4px solid #333',
-          boxShadow: '8px 8px 0 rgba(0,0,0,0.8)',
-          position: 'relative',
-          zIndex: 10,
-          textAlign: 'center'
-        }}>
+        <div className="landing-card">
           {/* Version Sticker */}
           <div style={{
             position: 'absolute',

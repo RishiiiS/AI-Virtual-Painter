@@ -423,13 +423,13 @@ const DrawingCanvas = ({ isDrawer, color, tool, brushSize, remoteStream, roomId,
     const eraserCursor = `url('data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m7%2021-4.3-4.3c-1-1-1-2.5%200-3.4l9.6-9.6c1-1%202.5-1%203.4%200l5.6%205.6c1%201%201%202.5%200%203.4L13%2021%22%2F%3E%3Cpath%20d%3D%22M22%2021H7%22%2F%3E%3Cpath%20d%3D%22m5%2011%209%209%22%2F%3E%3C%2Fsvg%3E') 0 24, cell`;
 
     return (
-        <div style={{
-            flex: 1,
+        <div className="drawing-canvas-wrapper" style={{
             backgroundColor: 'white',
             border: '4px solid #333',
             boxShadow: '8px 8px 0 rgba(0,0,0,0.2)',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            touchAction: 'none' // Prevent scrolling when drawing on mobile
         }}>
             <canvas
                 ref={canvasRef}

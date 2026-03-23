@@ -40,7 +40,8 @@ const PlayerList = ({ players: initialPlayers = [] }) => {
                 borderBottom: '4px solid #333',
                 paddingBottom: '10px',
                 margin: '0 0 15px 0',
-                textTransform: 'uppercase'
+                textTransform: 'uppercase',
+                textAlign: 'center'
             }}>
                 PLAYERS ({players.length}/8)
             </h3>

@@ -125,38 +125,23 @@ const Lobby = ({
   };
 
   return (
-    <div style={{
-      width: '100%',
-      maxWidth: '1200px',
-      padding: '20px',
-      display: 'flex',
-      flexDirection: 'column',
-      height: '90vh',
-      position: 'relative',
-      zIndex: 10
-    }}>
+    <div className="lobby-container">
       <LobbyHeader roomId={roomId} />
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 2fr 1fr',
-        gap: '20px',
-        flex: 1,
-        minHeight: 0
-      }}>
+      <div className="lobby-main-layout">
 
         {/* Left: Players */}
-        <div style={{ minWidth: 0 }}>
+        <div className="lobby-left-col">
           <PlayerList players={players} />
         </div>
 
         {/* Center: Settings */}
-        <div style={{ minWidth: 0 }}>
+        <div className="lobby-center-col">
           <SettingsPanel onStartGame={handleStartGame} isHost={isHost} roomId={roomId} setRoomId={setRoomId} players={players} playerName={playerName} />
         </div>
 
         {/* Right: Chat */}
-        <div style={{ minWidth: 0 }}>
+        <div className="lobby-right-col">
           <ChatPanel
             messages={chatHistory}
             onSendMessage={handleSendMessage}

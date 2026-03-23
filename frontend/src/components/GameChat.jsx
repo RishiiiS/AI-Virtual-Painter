@@ -134,6 +134,7 @@ const GameChat = ({ messages = [], onSendMessage, currentUser }) => {
                     onKeyDown={handleKeyDown}
                     style={{
                         flex: 1,
+                        minWidth: 0,
                         padding: '10px',
                         border: '3px solid #333',
                         fontFamily: '"Fredoka", sans-serif',

@@ -46,7 +46,8 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                 margin: '0 0 30px 0',
                 textTransform: 'uppercase',
                 zIndex: 1,
-                position: 'relative'
+                position: 'relative',
+                textAlign: 'center'
             }}>
                 ROOM SETTINGS
             </h2>
@@ -55,7 +56,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
                 <>
                     {/* Room Code Input (Host only) */}
                     <div style={{ marginBottom: '25px', zIndex: 1 }}>
-                        <h4 style={{ fontFamily: '"Titan One", sans-serif', margin: '0 0 10px 0' }}>ROOM CODE</h4>
+                        <h4 style={{ fontFamily: '"Titan One", sans-serif', margin: '0 0 10px 0', textAlign: 'center' }}>ROOM CODE</h4>
                         <input
                             type="text"
                             value={roomId}
@@ -75,7 +76,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
 
                     {/* Round Duration */}
                     <div style={{ marginBottom: '25px', zIndex: 1 }}>
-                        <h4 style={{ fontFamily: '"Titan One", sans-serif', margin: '0 0 10px 0' }}>ROUND DURATION</h4>
+                        <h4 style={{ fontFamily: '"Titan One", sans-serif', margin: '0 0 10px 0', textAlign: 'center' }}>ROUND DURATION</h4>
                         <div style={{ display: 'flex', gap: '10px' }}>
                             {[60, 90, 120].map((sec) => (
                                 <button
@@ -102,7 +103,7 @@ const SettingsPanel = ({ onStartGame, isHost, roomId, setRoomId, players = [], p
 
                     {/* Word Difficulty */}
                     <div style={{ marginBottom: '25px', zIndex: 1 }}>
-                        <h4 style={{ fontFamily: '"Titan One", sans-serif', margin: '0 0 10px 0' }}>WORD DIFFICULTY</h4>
+                        <h4 style={{ fontFamily: '"Titan One", sans-serif', margin: '0 0 10px 0', textAlign: 'center' }}>WORD DIFFICULTY</h4>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                             <input
                                 type="range"

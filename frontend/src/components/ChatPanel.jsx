@@ -55,7 +55,9 @@ const ChatPanel = ({ messages = [], onSendMessage, currentUser }) => {
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
-        backgroundColor: '#F4F4F4'
+        backgroundColor: '#F4F4F4',
+        wordBreak: 'break-word',
+        overflowWrap: 'anywhere'
       }}>
         {messages.map((msgStr, i) => {
           // Primitive parsing of "[Name]: Msg" format from backend
@@ -104,6 +106,7 @@ const ChatPanel = ({ messages = [], onSendMessage, currentUser }) => {
           onKeyDown={handleKeyDown}
           style={{
             flex: 1,
+            minWidth: 0,
             border: 'none',
             outline: 'none',
             fontFamily: '"Fredoka", sans-serif',

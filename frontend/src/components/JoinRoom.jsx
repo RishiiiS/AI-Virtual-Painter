@@ -5,12 +5,7 @@ const JoinRoom = ({ onJoin, onBack }) => {
     const [roomCode, setRoomCode] = useState('');
 
     return (
-        <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '20px',
-            width: '100%'
-        }}>
+        <div className="join-room-container">
             <h2 style={{
                 fontFamily: '"Titan One", sans-serif',
                 fontSize: '2rem',
@@ -41,7 +36,7 @@ const JoinRoom = ({ onJoin, onBack }) => {
                 }}
             />
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div className="form-buttons-row">
                 <button style={{
                     flex: 1,
                     padding: '15px',

@@ -2,7 +2,7 @@ import React from 'react';
 
 const ActionButtons = ({ onCreate, onJoin, isCreating = false }) => {
     return (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', width: '100%' }}>
+        <div className="action-buttons-container">
             <button style={{
                 flex: 1,
                 minWidth: '150px',

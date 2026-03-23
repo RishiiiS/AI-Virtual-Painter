@@ -2,13 +2,7 @@ import React from 'react';
 
 const LobbyHeader = ({ roomId }) => {
     return (
-        <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            marginBottom: '20px',
-            width: '100%'
-        }}>
+        <div className="lobby-header-container">
             {/* Left: Branding */}
             <div>
                 <h1 style={{
