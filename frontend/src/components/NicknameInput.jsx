@@ -10,6 +10,7 @@ const NicknameInput = ({ value, onChange }) => {
                 onChange={(e) => onChange(e.target.value)}
                 style={{
                     width: '100%',
+                    boxSizing: 'border-box',
                     padding: '15px',
                     fontSize: '1.2rem',
                     fontFamily: '"Titan One", sans-serif',

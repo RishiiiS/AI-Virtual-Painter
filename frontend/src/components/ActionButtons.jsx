@@ -2,9 +2,11 @@ import React from 'react';
 
 const ActionButtons = ({ onCreate, onJoin, isCreating = false }) => {
     return (
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', width: '100%' }}>
             <button style={{
                 flex: 1,
+                minWidth: '150px',
+                boxSizing: 'border-box',
                 padding: '15px',
                 backgroundColor: isCreating ? '#ccc' : '#EBC334',
                 color: '#333',
@@ -27,6 +29,8 @@ const ActionButtons = ({ onCreate, onJoin, isCreating = false }) => {
 
             <button style={{
                 flex: 1,
+                minWidth: '150px',
+                boxSizing: 'border-box',
                 padding: '15px',
                 backgroundColor: '#2A8C86',
                 color: 'white',

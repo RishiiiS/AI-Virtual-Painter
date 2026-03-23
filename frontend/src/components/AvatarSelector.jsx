@@ -15,7 +15,7 @@ const AvatarSelector = ({ selected = 1, onSelect }) => {
                 fontSize: '1.2rem'
             }}>Select Your Artist</h3>
 
-            <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '20px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '15px', justifyContent: 'center', marginTop: '20px' }}>
                 {AVATAR_KEYS.map((key, idx) => (
                     <div
                         key={key}
