@@ -15,16 +15,9 @@ const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize, inGame, 
 
     return (
         <>
-            <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '15px'
-            }}>
+            <div className="toolbar-container">
                 {/* Tools locked for non-drawers */}
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '15px',
+                <div className="toolbar-tools" style={{
                     pointerEvents: isDrawer ? 'auto' : 'none',
                     opacity: isDrawer ? 1 : 0.5,
                 }}>
@@ -32,19 +25,11 @@ const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize, inGame, 
                         <button
                             key={tool.id}
                             onClick={() => onSelectTool(tool.id)}
+                            className="toolbar-btn"
                             style={{
-                                width: '60px',
-                                height: '60px',
                                 backgroundColor: selectedTool === tool.id ? '#EBC334' : 'white',
-                                border: '3px solid #333',
-                                fontSize: '1.5rem',
-                                cursor: 'pointer',
                                 boxShadow: selectedTool === tool.id ? '2px 2px 0 #333' : '4px 4px 0 rgba(0,0,0,0.2)',
                                 transform: selectedTool === tool.id ? 'translate(2px, 2px)' : 'none',
-                                transition: 'all 0.1s',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center'
                             }}
                         >
                             {tool.icon}
@@ -52,18 +37,7 @@ const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize, inGame, 
                     ))}
 
                     {/* Brush Size Selector */}
-                    <div style={{
-                        width: '60px',
-                        backgroundColor: 'white',
-                        border: '3px solid #333',
-                        boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        padding: '10px 0',
-                        gap: '12px'
-                    }}>
+                    <div className="toolbar-brush-sizes">
                         {[5, 10, 20].map((size) => (
                             <div
                                 key={size}
@@ -93,17 +67,10 @@ const Toolbar = ({ selectedTool, onSelectTool, brushSize, onSelectSize, inGame, 
                 {/* Settings Button */}
                 <button
                     onClick={() => setShowSettings(true)}
+                    className="toolbar-btn"
                     style={{
-                        width: '60px',
-                        height: '60px',
                         backgroundColor: '#EBC334',
-                        border: '3px solid #333',
-                        cursor: 'pointer',
                         boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
-                        transition: 'all 0.1s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
                         color: '#333',
                     }}
                     onMouseDown={(e) => e.currentTarget.style.transform = 'translate(2px, 2px)'}

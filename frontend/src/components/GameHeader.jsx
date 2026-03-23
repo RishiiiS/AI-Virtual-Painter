@@ -22,13 +22,7 @@ const GameHeader = ({ word, timeLeft, isDrawer, isRoundActive }) => {
     };
 
     return (
-        <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '20px',
-            width: '100%'
-        }}>
+        <div className="game-header-layout">
             {/* Left: Branding */}
             <div>
                 <h1 style={{
@@ -54,14 +48,7 @@ const GameHeader = ({ word, timeLeft, isDrawer, isRoundActive }) => {
             </div>
 
             {/* Center: Word Display */}
-            <div style={{
-                backgroundColor: 'white',
-                border: '4px solid #333',
-                padding: '10px 40px',
-                textAlign: 'center',
-                boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
-                transform: 'rotate(-2deg)'
-            }}>
+            <div className="word-display-box">
                 <div style={{ fontFamily: '"Fredoka", sans-serif', fontSize: '0.9rem', color: '#777', fontWeight: 'bold' }}>
                     THE WORD IS
                 </div>

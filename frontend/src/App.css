@@ -84,3 +84,215 @@ body {
   background-color: var(--color-yellow);
   transform: rotate(45deg);
 }
+
+/* --- Game Page Responsive Layout Classes --- */
+.game-main-layout {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 20px;
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.game-left-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.game-center-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.game-right-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 20px;
+  width: 300px;
+  flex-shrink: 0;
+  height: 100%;
+}
+
+.game-header-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  width: 100%;
+  gap: 15px;
+}
+
+/* --- Component Layout Classes (Desktop Defaults) --- */
+.toolbar-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.toolbar-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+.toolbar-brush-sizes {
+  width: 60px;
+  background-color: white;
+  border: 3px solid #333;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+  gap: 12px;
+}
+
+/* New scalable classes */
+.toolbar-btn {
+  width: 60px;
+  height: 60px;
+  border: 3px solid #333;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.1s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.palette-container {
+  display: flex;
+  gap: 10px;
+  background-color: white;
+  border: 4px solid #333;
+  padding: 10px 20px;
+  box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
+  align-items: center;
+}
+.color-square {
+  width: 35px;
+  height: 35px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+.current-color-preview {
+  width: 50px;
+  height: 50px;
+  border: 3px solid #333;
+}
+.palette-divider {
+  width: 2px;
+  height: 40px;
+  background-color: #ccc;
+  margin: 0 10px;
+}
+
+.word-display-box {
+  background-color: white;
+  border: 4px solid #333;
+  padding: 10px 40px;
+  text-align: center;
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  transform: rotate(-2deg);
+}
+
+
+/* Tablet and Mobile Media Queries */
+@media screen and (max-width: 1024px) {
+  /* Wrap header items */
+  .game-header-layout {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .word-display-box {
+    padding: 10px 15px; /* squeeze padding so it fits */
+  }
+  
+  /* Stack Layout */
+  .game-main-layout {
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    overflow-y: visible;
+    overflow-x: hidden;
+  }
+
+  /* Toolbar */
+  .game-left-col {
+    flex-direction: row;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    height: auto;
+  }
+  .toolbar-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .toolbar-tools {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px; /* reduce gaps */
+  }
+  .toolbar-btn {
+    width: 45px;
+    height: 45px;
+    font-size: 1.2rem;
+  }
+  .toolbar-brush-sizes {
+    flex-direction: row;
+    width: auto;
+    padding: 0 10px;
+  }
+
+  /* Canvas area */
+  .game-center-col {
+    width: 100%;
+    flex: none; /* let it naturally size based on canvas */
+    aspect-ratio: 1 / 1; /* Increase height for drawing */
+  }
+
+  /* Palette */
+  .palette-container {
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 10px;
+  }
+  .palette-divider {
+    display: none; /* hide divider when wrapping heavily */
+  }
+  .color-square {
+    width: 25px;
+    height: 25px;
+  }
+  .current-color-preview {
+    width: 35px;
+    height: 35px;
+  }
+
+  /* Chat/Players area */
+  .game-right-col {
+    width: 100%;
+    height: 380px; /* Increased back up so chat/players are more usable, while canvas remains 1:1 */
+  }
+
+  /* Allow main container to scroll */
+  .game-outer-container {
+    overflow-y: auto !important;
+  }
+}

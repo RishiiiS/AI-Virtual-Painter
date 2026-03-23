@@ -437,7 +437,7 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame, onHos
     }
 
     return (
-        <div style={{
+        <div className="game-outer-container" style={{
             width: '100%',
             height: '100%',
             padding: '20px',
@@ -455,25 +455,10 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame, onHos
                 isRoundActive={gameState.round_active}
             />
 
-            <div style={{
-                display: 'flex',
-                alignItems: 'stretch',
-                justifyContent: 'center',
-                gap: '20px',
-                flex: 1,
-                minHeight: 0,
-                marginTop: '10px'
-            }}>
+            <div className="game-main-layout">
 
                 {/* Left: Toolbar */}
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    gap: '20px',
-                    width: '80px',
-                    flexShrink: 0
-                }}>
+                <div className="game-left-col">
                     <Toolbar
                         selectedTool={selectedTool}
                         onSelectTool={(t) => {
@@ -498,16 +483,7 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame, onHos
                 </div>
 
                 {/* Center: Canvas & Palette */}
-                <div style={{
-                    flex: 1,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    gap: '20px',
-                    minWidth: 0,
-                    minHeight: 0,
-                    overflow: 'hidden'
-                }}>
+                <div className="game-center-col">
                     <DrawingCanvas
                         isDrawer={isDrawer}
                         color={selectedColor}
@@ -535,15 +511,7 @@ const Game = ({ playerName, roomId, isHost, avatarKey = 'star', onEndGame, onHos
                 </div>
 
                 {/* Right: Players & Chat */}
-                <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'center',
-                    gap: '20px',
-                    width: '300px',
-                    flexShrink: 0,
-                    height: '100%'
-                }}>
+                <div className="game-right-col">
                     <div style={{ flex: 1, minHeight: 0 }}>
                         <PlayerList players={displayPlayers} />
                     </div>

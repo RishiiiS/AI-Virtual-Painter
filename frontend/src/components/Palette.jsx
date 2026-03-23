@@ -8,41 +8,26 @@ const COLORS = [
 
 const Palette = ({ selectedColor, onSelectColor }) => {
     return (
-        <div style={{
-            display: 'flex',
-            gap: '10px',
-            backgroundColor: 'white',
-            border: '4px solid #333',
-            padding: '10px 20px',
-            boxShadow: '6px 6px 0 rgba(0,0,0,0.2)',
-            alignItems: 'center'
-        }}>
+        <div className="palette-container">
             {COLORS.map((color) => (
                 <div
                     key={color}
                     onClick={() => onSelectColor(color)}
+                    className="color-square"
                     style={{
-                        width: '35px',
-                        height: '35px',
                         backgroundColor: color,
                         border: selectedColor === color ? '3px solid #333' : '3px solid rgba(0,0,0,0.2)',
                         boxShadow: selectedColor === color ? 'none' : '2px 2px 0 rgba(0,0,0,0.1)',
-                        cursor: 'pointer',
                         transform: selectedColor === color ? 'scale(1.1)' : 'scale(1)',
-                        transition: 'transform 0.1s'
                     }}
                 ></div>
             ))}
 
-            <div style={{ width: '2px', height: '40px', backgroundColor: '#ccc', margin: '0 10px' }}></div>
+            <div className="palette-divider"></div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{
-                    width: '50px',
-                    height: '50px',
+                <div className="current-color-preview" style={{
                     backgroundColor: selectedColor,
-                    border: '3px solid #333',
-                    // boxShadow: '3px 3px 0 rgba(0,0,0,0.2)'
                 }}></div>
                 <div style={{
                     fontFamily: '"Fredoka", sans-serif',
